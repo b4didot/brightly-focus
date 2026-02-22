@@ -1,0 +1,195 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f4f1e8;
+  --surface: #fffdf8;
+  --ink: #1f1b16;
+  --muted: #6f6557;
+  --line: #d7cfc1;
+  --accent: #b24d2f;
+  --accent-ink: #fff9f4;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top right, #fff4dc 0%, var(--bg) 45%);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
+}
+
+.page-shell {
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+
+.top-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.top-bar h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 1.7vw + 1rem, 2rem);
+}
+
+.top-bar p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+select,
+input,
+button {
+  font: inherit;
+}
+
+select,
+input {
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0.55rem 0.7rem;
+}
+
+button {
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+}
+
+button.solid {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.layout-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 1rem;
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+}
+
+.panel h2,
+.panel h3 {
+  margin: 0;
+}
+
+.muted {
+  margin: -0.55rem 0 0;
+  color: var(--muted);
+}
+
+.stack {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.item-card,
+.inbox-card,
+.visibility-card {
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: #fffcf6;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.item-card {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.item-card p,
+.inbox-card p {
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+}
+
+.admin-form {
+  display: grid;
+  gap: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  background: #fffaf1;
+}
+
+.empty {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.history-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: #fffcf6;
+}
+
+.warn {
+  color: #8e3c25;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 1100px) {
+  .layout-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .page-shell {
+    padding: 1rem;
+  }
+
+  .input-row {
+    grid-template-columns: 1fr;
+  }
+}
