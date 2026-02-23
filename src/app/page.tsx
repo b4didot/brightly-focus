@@ -1,391 +1,67 @@
-"use client";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { acceptItem } from "../../lib/focus-engine/acceptItem";
+import { activateItem } from "../../lib/focus-engine/activateItem";
+import { completeItem } from "../../lib/focus-engine/completeItem";
+import { reorderWaitingItem } from "../../lib/focus-engine/reorderWaitingItem";
+import { getSupabaseServerClient } from "../../lib/supabase/server";
 
-import { FormEvent, useMemo, useReducer, useState } from "react";
+type SearchParams = {
+  userId?: string;
+};
 
-type Role = "user" | "admin";
-type ItemState = "active" | "waiting" | "pending_acceptance" | "needs_info" | "completed";
-type AssignmentStatus = "pending_acceptance" | "accepted" | "needs_info" | "declined";
-type EventType = "assigned" | "accepted" | "declined" | "switched" | "completed";
-
-type User = {
+type DbUser = {
   id: string;
-  name: string;
-  role: Role;
+  name?: string | null;
+  role?: string | null;
+  full_name?: string | null;
+  display_name?: string | null;
+  email?: string | null;
+  [key: string]: unknown;
 };
 
-type Item = {
+type DbItem = {
   id: string;
-  title: string;
-  ownerId: string;
-  createdBy: string;
-  state: ItemState;
-  queueOrder: number | null;
-  completedAt?: string;
+  title?: string | null;
+  state?: string | null;
+  execution_owner_id?: string | null;
+  owner_id?: string | null;
+  user_id?: string | null;
+  waiting_position?: number | null;
+  queue_order?: number | null;
+  completed_at?: string | null;
+  completedAt?: string | null;
+  [key: string]: unknown;
 };
 
-type Assignment = {
-  id: string;
-  itemId: string;
-  assignerId: string;
-  assigneeId: string;
-  status: AssignmentStatus;
-  updatedAt: string;
-};
+function asDisplayName(user: DbUser) {
+  const candidate =
+    user.name ??
+    user.full_name ??
+    user.display_name ??
+    user.email;
 
-type ItemEvent = {
-  id: string;
-  itemId: string;
-  actorId: string;
-  type: EventType;
-  at: string;
-  note?: string;
-};
-
-type AppState = {
-  users: User[];
-  items: Item[];
-  assignments: Assignment[];
-  events: ItemEvent[];
-  currentUserId: string;
-};
-
-type Action =
-  | { type: "SET_CURRENT_USER"; userId: string }
-  | { type: "CREATE_ITEM"; ownerId: string; actorId: string; title: string }
-  | { type: "ADMIN_ASSIGN"; assignerId: string; assigneeId: string; title: string }
-  | { type: "START_FOCUS"; actorId: string; itemId: string }
-  | { type: "COMPLETE_ACTIVE"; actorId: string }
-  | { type: "MOVE_WAITING"; actorId: string; itemId: string; direction: "up" | "down" }
-  | { type: "ACCEPT_ASSIGNMENT"; actorId: string; assignmentId: string }
-  | { type: "DECLINE_ASSIGNMENT"; actorId: string; assignmentId: string };
-
-const initialState: AppState = {
-  currentUserId: "user-1",
-  users: [
-    { id: "user-1", name: "John Arias", role: "user" },
-    { id: "user-2", name: "Mia Reyes", role: "user" },
-    { id: "admin-1", name: "Avery Cole", role: "admin" },
-  ],
-  items: [
-    { id: "item-1", title: "Ship auth error fix", ownerId: "user-1", createdBy: "user-1", state: "active", queueOrder: null },
-    { id: "item-2", title: "Prepare sprint notes", ownerId: "user-1", createdBy: "user-1", state: "waiting", queueOrder: 0 },
-    { id: "item-3", title: "Refactor inbox API", ownerId: "user-1", createdBy: "admin-1", state: "waiting", queueOrder: 1 },
-    { id: "item-4", title: "Landing page QA", ownerId: "user-2", createdBy: "user-2", state: "active", queueOrder: null },
-    { id: "item-5", title: "Analytics event audit", ownerId: "user-2", createdBy: "admin-1", state: "waiting", queueOrder: 0 },
-    { id: "item-6", title: "Finalize billing copy", ownerId: "user-1", createdBy: "user-1", state: "completed", queueOrder: null, completedAt: "2026-02-20T09:00:00.000Z" },
-    { id: "item-7", title: "Handoff legal review", ownerId: "user-1", createdBy: "admin-1", state: "pending_acceptance", queueOrder: null },
-  ],
-  assignments: [
-    {
-      id: "assignment-1",
-      itemId: "item-7",
-      assignerId: "admin-1",
-      assigneeId: "user-1",
-      status: "pending_acceptance",
-      updatedAt: "2026-02-22T08:00:00.000Z",
-    },
-  ],
-  events: [
-    { id: "event-1", itemId: "item-6", actorId: "user-1", type: "completed", at: "2026-02-20T09:00:00.000Z" },
-    { id: "event-2", itemId: "item-7", actorId: "admin-1", type: "assigned", at: "2026-02-22T08:00:00.000Z" },
-  ],
-};
-
-function nowIso() {
-  return new Date().toISOString();
+  return typeof candidate === "string" && candidate.trim() ? candidate.trim() : user.id;
 }
 
-function nextId(prefix: string, existing: { id: string }[]) {
-  const current = existing.length + 1;
-  return `${prefix}-${current}`;
+function asItemTitle(item: DbItem) {
+  return item.title?.trim() || `Item ${item.id}`;
 }
 
-function getUser(state: AppState, userId: string) {
-  return state.users.find((u) => u.id === userId);
+function getItemOwnerId(item: DbItem) {
+  return item.execution_owner_id ?? item.owner_id ?? item.user_id ?? null;
 }
 
-function getWaitingItems(items: Item[], ownerId: string) {
-  return items
-    .filter((item) => item.ownerId === ownerId && item.state === "waiting")
-    .sort((a, b) => (a.queueOrder ?? Number.MAX_SAFE_INTEGER) - (b.queueOrder ?? Number.MAX_SAFE_INTEGER));
+function getItemState(item: DbItem) {
+  return item.state ?? null;
 }
 
-function getActiveItem(items: Item[], ownerId: string) {
-  return items.find((item) => item.ownerId === ownerId && item.state === "active");
+function getItemWaitingPosition(item: DbItem) {
+  return item.waiting_position ?? item.queue_order ?? null;
 }
 
-function reindexWaiting(items: Item[], ownerId: string) {
-  const waiting = getWaitingItems(items, ownerId);
-  waiting.forEach((item, index) => {
-    item.queueOrder = index;
-  });
-}
-
-function insertWaitingOnTop(items: Item[], ownerId: string, itemId: string) {
-  items.forEach((item) => {
-    if (item.ownerId === ownerId && item.state === "waiting" && item.id !== itemId) {
-      item.queueOrder = (item.queueOrder ?? 0) + 1;
-    }
-  });
-  const target = items.find((item) => item.id === itemId);
-  if (!target) {
-    return;
-  }
-  target.state = "waiting";
-  target.queueOrder = 0;
-  delete target.completedAt;
-  reindexWaiting(items, ownerId);
-}
-
-function appReducer(state: AppState, action: Action): AppState {
-  switch (action.type) {
-    case "SET_CURRENT_USER":
-      return { ...state, currentUserId: action.userId };
-
-    case "CREATE_ITEM": {
-      const owner = getUser(state, action.ownerId);
-      if (!owner) {
-        return state;
-      }
-      const title = action.title.trim();
-      if (!title) {
-        return state;
-      }
-      const newItem: Item = {
-        id: nextId("item", state.items),
-        title,
-        ownerId: action.ownerId,
-        createdBy: action.actorId,
-        state: "waiting",
-        queueOrder: 0,
-      };
-      const items = state.items.map((item) => ({ ...item }));
-      items.forEach((item) => {
-        if (item.ownerId === action.ownerId && item.state === "waiting") {
-          item.queueOrder = (item.queueOrder ?? 0) + 1;
-        }
-      });
-      items.push(newItem);
-      reindexWaiting(items, action.ownerId);
-      return { ...state, items };
-    }
-
-    case "ADMIN_ASSIGN": {
-      const assigner = getUser(state, action.assignerId);
-      const assignee = getUser(state, action.assigneeId);
-      if (!assigner || assigner.role !== "admin" || !assignee) {
-        return state;
-      }
-      const title = action.title.trim();
-      if (!title) {
-        return state;
-      }
-
-      const newItem: Item = {
-        id: nextId("item", state.items),
-        title,
-        ownerId: action.assigneeId,
-        createdBy: action.assignerId,
-        state: "pending_acceptance",
-        queueOrder: null,
-      };
-
-      const assignment: Assignment = {
-        id: nextId("assignment", state.assignments),
-        itemId: newItem.id,
-        assignerId: action.assignerId,
-        assigneeId: action.assigneeId,
-        status: "pending_acceptance",
-        updatedAt: nowIso(),
-      };
-
-      const event: ItemEvent = {
-        id: nextId("event", state.events),
-        itemId: newItem.id,
-        actorId: action.assignerId,
-        type: "assigned",
-        at: nowIso(),
-      };
-
-      return {
-        ...state,
-        items: [...state.items, newItem],
-        assignments: [...state.assignments, assignment],
-        events: [...state.events, event],
-      };
-    }
-
-    case "START_FOCUS": {
-      const items = state.items.map((item) => ({ ...item }));
-      const actor = getUser(state, action.actorId);
-      const selected = items.find((item) => item.id === action.itemId);
-      if (!actor || !selected || selected.ownerId !== actor.id || selected.state !== "waiting") {
-        return state;
-      }
-
-      const currentActive = items.find((item) => item.ownerId === actor.id && item.state === "active");
-      selected.state = "active";
-      selected.queueOrder = null;
-
-      if (currentActive && currentActive.id !== selected.id) {
-        currentActive.state = "waiting";
-        currentActive.queueOrder = 0;
-        items.forEach((item) => {
-          if (item.ownerId === actor.id && item.state === "waiting" && item.id !== currentActive.id) {
-            item.queueOrder = (item.queueOrder ?? 0) + 1;
-          }
-        });
-      }
-
-      reindexWaiting(items, actor.id);
-      const event: ItemEvent = {
-        id: nextId("event", state.events),
-        itemId: selected.id,
-        actorId: action.actorId,
-        type: "switched",
-        at: nowIso(),
-      };
-      return { ...state, items, events: [...state.events, event] };
-    }
-
-    case "COMPLETE_ACTIVE": {
-      const actor = getUser(state, action.actorId);
-      if (!actor) {
-        return state;
-      }
-      const items = state.items.map((item) => ({ ...item }));
-      const activeItem = items.find((item) => item.ownerId === actor.id && item.state === "active");
-      if (!activeItem) {
-        return state;
-      }
-
-      activeItem.state = "completed";
-      activeItem.queueOrder = null;
-      activeItem.completedAt = nowIso();
-
-      const waiting = getWaitingItems(items, actor.id);
-      const next = waiting[0];
-      if (next) {
-        next.state = "active";
-        next.queueOrder = null;
-      }
-      reindexWaiting(items, actor.id);
-
-      const event: ItemEvent = {
-        id: nextId("event", state.events),
-        itemId: activeItem.id,
-        actorId: action.actorId,
-        type: "completed",
-        at: nowIso(),
-      };
-      return { ...state, items, events: [...state.events, event] };
-    }
-
-    case "MOVE_WAITING": {
-      const actor = getUser(state, action.actorId);
-      if (!actor) {
-        return state;
-      }
-      const items = state.items.map((item) => ({ ...item }));
-      const item = items.find((candidate) => candidate.id === action.itemId);
-      if (!item || item.ownerId !== actor.id || item.state !== "waiting") {
-        return state;
-      }
-
-      const waiting = getWaitingItems(items, actor.id);
-      const index = waiting.findIndex((entry) => entry.id === item.id);
-      if (index < 0) {
-        return state;
-      }
-      const targetIndex = action.direction === "up" ? index - 1 : index + 1;
-      if (targetIndex < 0 || targetIndex >= waiting.length) {
-        return state;
-      }
-      const target = waiting[targetIndex];
-      const originalOrder = item.queueOrder ?? index;
-      item.queueOrder = target.queueOrder ?? targetIndex;
-      target.queueOrder = originalOrder;
-      reindexWaiting(items, actor.id);
-      return { ...state, items };
-    }
-
-    case "ACCEPT_ASSIGNMENT": {
-      const actor = getUser(state, action.actorId);
-      if (!actor) {
-        return state;
-      }
-
-      const assignments = state.assignments.map((assignment) => ({ ...assignment }));
-      const items = state.items.map((item) => ({ ...item }));
-      const assignment = assignments.find((entry) => entry.id === action.assignmentId);
-      if (!assignment || assignment.assigneeId !== actor.id || assignment.status !== "pending_acceptance") {
-        return state;
-      }
-      const item = items.find((entry) => entry.id === assignment.itemId);
-      if (!item || item.ownerId !== actor.id || item.state !== "pending_acceptance") {
-        return state;
-      }
-
-      assignment.status = "accepted";
-      assignment.updatedAt = nowIso();
-      insertWaitingOnTop(items, actor.id, item.id);
-
-      const event: ItemEvent = {
-        id: nextId("event", state.events),
-        itemId: item.id,
-        actorId: actor.id,
-        type: "accepted",
-        at: nowIso(),
-      };
-
-      return { ...state, assignments, items, events: [...state.events, event] };
-    }
-
-    case "DECLINE_ASSIGNMENT": {
-      const actor = getUser(state, action.actorId);
-      if (!actor) {
-        return state;
-      }
-
-      const assignments = state.assignments.map((assignment) => ({ ...assignment }));
-      const items = state.items.map((item) => ({ ...item }));
-      const assignment = assignments.find((entry) => entry.id === action.assignmentId);
-      if (!assignment || assignment.assigneeId !== actor.id || assignment.status !== "pending_acceptance") {
-        return state;
-      }
-      const item = items.find((entry) => entry.id === assignment.itemId);
-      if (!item || item.ownerId !== actor.id || item.state !== "pending_acceptance") {
-        return state;
-      }
-
-      assignment.status = "needs_info";
-      assignment.updatedAt = nowIso();
-      item.state = "needs_info";
-      item.queueOrder = null;
-
-      const event: ItemEvent = {
-        id: nextId("event", state.events),
-        itemId: item.id,
-        actorId: actor.id,
-        type: "declined",
-        at: nowIso(),
-      };
-
-      return { ...state, assignments, items, events: [...state.events, event] };
-    }
-
-    default:
-      return state;
-  }
-}
-
-function ItemCard({ title, right }: { title: string; right?: React.ReactNode }) {
-  return (
-    <div className="item-card">
-      <p>{title}</p>
-      {right}
-    </div>
-  );
+function getItemCompletedAt(item: DbItem) {
+  return item.completed_at ?? item.completedAt ?? null;
 }
 
 function formatDate(value: string) {
@@ -397,195 +73,225 @@ function formatDate(value: string) {
   });
 }
 
-export default function Home() {
-  const [state, dispatch] = useReducer(appReducer, initialState);
-  const [newTitle, setNewTitle] = useState("");
-  const [assignmentTitle, setAssignmentTitle] = useState("");
-  const [assignmentTarget, setAssignmentTarget] = useState("user-1");
+function sortByCompletedAtDesc(items: DbItem[]) {
+  return [...items].sort((a, b) => {
+    const left = getItemCompletedAt(a) ?? "";
+    const right = getItemCompletedAt(b) ?? "";
+    return right.localeCompare(left);
+  });
+}
 
-  const currentUser = useMemo(
-    () => state.users.find((user) => user.id === state.currentUserId) ?? state.users[0],
-    [state.currentUserId, state.users],
-  );
+function toFocusRedirectPath(userId: string) {
+  return `/?userId=${encodeURIComponent(userId)}`;
+}
 
-  const myActive = useMemo(() => getActiveItem(state.items, currentUser.id), [state.items, currentUser.id]);
-  const myWaiting = useMemo(() => getWaitingItems(state.items, currentUser.id), [state.items, currentUser.id]);
-  const myCompleted = useMemo(
-    () =>
-      state.items
-        .filter((item) => item.ownerId === currentUser.id && item.state === "completed")
-        .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
-        .slice(0, 5),
-    [state.items, currentUser.id],
-  );
+async function acceptItemAction(formData: FormData) {
+  "use server";
 
-  const myPendingAssignments = useMemo(
-    () =>
-      state.assignments.filter(
-        (assignment) =>
-          assignment.assigneeId === currentUser.id &&
-          (assignment.status === "pending_acceptance" || assignment.status === "needs_info"),
-      ),
-    [state.assignments, currentUser.id],
-  );
+  const userId = String(formData.get("userId") ?? "").trim();
+  const itemId = String(formData.get("itemId") ?? "").trim();
 
-  const userProfiles = state.users.filter((user) => user.role === "user");
+  await acceptItem({ itemId, userId });
+  revalidatePath("/");
+  redirect(toFocusRedirectPath(userId));
+}
 
-  function onCreateItem(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    dispatch({ type: "CREATE_ITEM", actorId: currentUser.id, ownerId: currentUser.id, title: newTitle });
-    setNewTitle("");
+async function activateItemAction(formData: FormData) {
+  "use server";
+
+  const userId = String(formData.get("userId") ?? "").trim();
+  const itemId = String(formData.get("itemId") ?? "").trim();
+
+  await activateItem({ itemId, userId });
+  revalidatePath("/");
+  redirect(toFocusRedirectPath(userId));
+}
+
+async function completeItemAction(formData: FormData) {
+  "use server";
+
+  const userId = String(formData.get("userId") ?? "").trim();
+  const itemId = String(formData.get("itemId") ?? "").trim();
+
+  await completeItem({ itemId, userId });
+  revalidatePath("/");
+  redirect(toFocusRedirectPath(userId));
+}
+
+async function reorderWaitingItemAction(formData: FormData) {
+  "use server";
+
+  const userId = String(formData.get("userId") ?? "").trim();
+  const itemId = String(formData.get("itemId") ?? "").trim();
+  const direction = String(formData.get("direction") ?? "").trim();
+
+  await reorderWaitingItem({
+    itemId,
+    userId,
+    direction: direction as "up" | "down",
+  });
+  revalidatePath("/");
+  redirect(toFocusRedirectPath(userId));
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: Promise<SearchParams>;
+}) {
+  const params = (await searchParams) ?? {};
+  const supabase = getSupabaseServerClient();
+
+  const { data: usersData, error: usersError } = await supabase
+    .from("users")
+    .select("*");
+
+  if (usersError) {
+    throw new Error(`Failed to load users: ${usersError.message}`);
   }
 
-  function onCreateAssignment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    dispatch({
-      type: "ADMIN_ASSIGN",
-      assignerId: currentUser.id,
-      assigneeId: assignmentTarget,
-      title: assignmentTitle,
-    });
-    setAssignmentTitle("");
+  const users = ((usersData ?? []) as DbUser[]).sort((a, b) => asDisplayName(a).localeCompare(asDisplayName(b)));
+  const selectedUserId = params.userId && users.some((user) => user.id === params.userId) ? params.userId : users[0]?.id;
+
+  const { data: itemsData, error: itemsError } = await supabase
+    .from("items")
+    .select("*");
+
+  if (itemsError) {
+    throw new Error(`Failed to load items: ${itemsError.message}`);
   }
+
+  const items = (itemsData ?? []) as DbItem[];
+  const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
+
+  const selectedItems = selectedUserId
+    ? items.filter((item) => getItemOwnerId(item) === selectedUserId)
+    : [];
+
+  const activeItem = selectedItems.find((item) => getItemState(item) === "active") ?? null;
+  const offeredItems = [...selectedItems]
+    .filter((item) => getItemState(item) === "offered")
+    .sort(
+      (a, b) =>
+        (getItemWaitingPosition(a) ?? Number.MAX_SAFE_INTEGER) -
+        (getItemWaitingPosition(b) ?? Number.MAX_SAFE_INTEGER)
+    );
+  const waitingItems = [...selectedItems]
+    .filter((item) => getItemState(item) === "waiting")
+    .sort(
+      (a, b) =>
+        (getItemWaitingPosition(a) ?? Number.MAX_SAFE_INTEGER) -
+        (getItemWaitingPosition(b) ?? Number.MAX_SAFE_INTEGER)
+    );
+  const completedItems = sortByCompletedAtDesc(
+    selectedItems.filter((item) => getItemState(item) === "completed")
+  ).slice(0, 5);
+
+  const teamProfiles = users.filter((user) => user.role !== "admin");
 
   return (
     <div className="page-shell">
       <header className="top-bar">
         <div>
           <h1>Brightly: Focus Queue Core</h1>
-          <p>One active item. User-owned queue. Visibility without control.</p>
+          <p>DB-backed view with live state transitions via Focus Engine.</p>
         </div>
-        <label>
-          Acting as
-          <select value={currentUser.id} onChange={(event) => dispatch({ type: "SET_CURRENT_USER", userId: event.target.value })}>
-            {state.users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.name} ({user.role})
-              </option>
-            ))}
-          </select>
-        </label>
+        <form method="get">
+          <label>
+            Acting as
+            <select name="userId" defaultValue={selectedUserId}>
+              {users.length === 0 ? (
+                <option value="">No users found</option>
+              ) : (
+                users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {asDisplayName(user)}
+                    {user.role ? ` (${user.role})` : ""}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+          <button type="submit" className="solid" style={{ marginTop: "0.5rem" }}>
+            Switch
+          </button>
+        </form>
       </header>
 
       <main className="layout-grid">
         <section className="panel">
           <h2>My Focus</h2>
-          <p className="muted">{currentUser.name}</p>
+          <p className="muted">{selectedUser ? asDisplayName(selectedUser) : "No user selected"}</p>
 
           <div className="stack">
             <h3>Active</h3>
-            {myActive ? (
-              <ItemCard
-                title={myActive.title}
-                right={
-                  <button
-                    type="button"
-                    className="solid"
-                    onClick={() => dispatch({ type: "COMPLETE_ACTIVE", actorId: currentUser.id })}
-                  >
+            {activeItem ? (
+              <div className="item-card">
+                <p>{asItemTitle(activeItem)}</p>
+                <form action={completeItemAction}>
+                  <input type="hidden" name="userId" value={selectedUserId ?? ""} />
+                  <input type="hidden" name="itemId" value={activeItem.id} />
+                  <button type="submit" className="solid">
                     Complete
                   </button>
-                }
-              />
+                </form>
+              </div>
             ) : (
-              <p className="empty">No active item. Start focus from waiting.</p>
+              <p className="empty">No active item.</p>
+            )}
+          </div>
+
+          <div className="stack">
+            <h3>Offered</h3>
+            {offeredItems.length === 0 ? (
+              <p className="empty">No offered items.</p>
+            ) : (
+              offeredItems.map((item) => (
+                <div key={item.id} className="item-card">
+                  <p>{asItemTitle(item)}</p>
+                  <form action={acceptItemAction}>
+                    <input type="hidden" name="userId" value={selectedUserId ?? ""} />
+                    <input type="hidden" name="itemId" value={item.id} />
+                    <button type="submit">Accept</button>
+                  </form>
+                </div>
+              ))
             )}
           </div>
 
           <div className="stack">
             <h3>Waiting Queue</h3>
-            {myWaiting.length === 0 ? (
+            {waitingItems.length === 0 ? (
               <p className="empty">No waiting items.</p>
             ) : (
-              myWaiting.map((item, index) => (
-                <ItemCard
-                  key={item.id}
-                  title={`${index + 1}. ${item.title}`}
-                  right={
-                    <div className="actions">
-                      <button type="button" onClick={() => dispatch({ type: "START_FOCUS", actorId: currentUser.id, itemId: item.id })}>
-                        Start Focus
-                      </button>
-                      <button type="button" onClick={() => dispatch({ type: "MOVE_WAITING", actorId: currentUser.id, itemId: item.id, direction: "up" })}>
+              waitingItems.map((item, index) => (
+                <div key={item.id} className="item-card">
+                  <p>
+                    {index + 1}. {asItemTitle(item)}
+                  </p>
+                  <div className="actions">
+                    <form action={activateItemAction}>
+                      <input type="hidden" name="userId" value={selectedUserId ?? ""} />
+                      <input type="hidden" name="itemId" value={item.id} />
+                      <button type="submit">Start Focus</button>
+                    </form>
+                    <form action={reorderWaitingItemAction}>
+                      <input type="hidden" name="userId" value={selectedUserId ?? ""} />
+                      <input type="hidden" name="itemId" value={item.id} />
+                      <input type="hidden" name="direction" value="up" />
+                      <button type="submit" disabled={index === 0}>
                         Up
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => dispatch({ type: "MOVE_WAITING", actorId: currentUser.id, itemId: item.id, direction: "down" })}
-                      >
+                    </form>
+                    <form action={reorderWaitingItemAction}>
+                      <input type="hidden" name="userId" value={selectedUserId ?? ""} />
+                      <input type="hidden" name="itemId" value={item.id} />
+                      <input type="hidden" name="direction" value="down" />
+                      <button type="submit" disabled={index === waitingItems.length - 1}>
                         Down
                       </button>
-                    </div>
-                  }
-                />
-              ))
-            )}
-          </div>
-
-          <form className="input-row" onSubmit={onCreateItem}>
-            <input
-              placeholder="Add a new waiting item"
-              value={newTitle}
-              onChange={(event) => setNewTitle(event.target.value)}
-              maxLength={120}
-            />
-            <button type="submit" className="solid">
-              Add Item
-            </button>
-          </form>
-        </section>
-
-        <section className="panel">
-          <h2>Assignments Inbox</h2>
-          {myPendingAssignments.length === 0 ? (
-            <p className="empty">No pending assignments.</p>
-          ) : (
-            <div className="stack">
-              {myPendingAssignments.map((assignment) => {
-                const item = state.items.find((entry) => entry.id === assignment.itemId);
-                const assigner = state.users.find((entry) => entry.id === assignment.assignerId);
-                if (!item || !assigner) {
-                  return null;
-                }
-                return (
-                  <div key={assignment.id} className="inbox-card">
-                    <p>{item.title}</p>
-                    <span>From {assigner.name}</span>
-                    <span>Status: {assignment.status}</span>
-                    {assignment.status === "pending_acceptance" ? (
-                      <div className="actions">
-                        <button
-                          type="button"
-                          className="solid"
-                          onClick={() => dispatch({ type: "ACCEPT_ASSIGNMENT", actorId: currentUser.id, assignmentId: assignment.id })}
-                        >
-                          Accept
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => dispatch({ type: "DECLINE_ASSIGNMENT", actorId: currentUser.id, assignmentId: assignment.id })}
-                        >
-                          Decline
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="warn">Waiting for clarifying info from assigner.</span>
-                    )}
+                    </form>
                   </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="stack">
-            <h3>Recent Completed</h3>
-            {myCompleted.length === 0 ? (
-              <p className="empty">No completed history yet.</p>
-            ) : (
-              myCompleted.map((item) => (
-                <div key={item.id} className="history-row">
-                  <span>{item.title}</span>
-                  <span>{item.completedAt ? formatDate(item.completedAt) : "n/a"}</span>
                 </div>
               ))
             )}
@@ -593,64 +299,66 @@ export default function Home() {
         </section>
 
         <section className="panel">
-          <h2>Team Visibility (Admin Read-Only)</h2>
-          {currentUser.role === "admin" ? (
-            <>
-              <form className="admin-form" onSubmit={onCreateAssignment}>
-                <h3>Create Assignment</h3>
-                <label>
-                  Assignee
-                  <select value={assignmentTarget} onChange={(event) => setAssignmentTarget(event.target.value)}>
-                    {userProfiles.map((profile) => (
-                      <option key={profile.id} value={profile.id}>
-                        {profile.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Item title
-                  <input
-                    placeholder="Assignment title"
-                    value={assignmentTitle}
-                    onChange={(event) => setAssignmentTitle(event.target.value)}
-                    maxLength={120}
-                  />
-                </label>
-                <button type="submit" className="solid">
-                  Assign
-                </button>
-              </form>
+          <h2>Recent Completed</h2>
+          <p className="muted">Latest completed items for selected user</p>
+          <div className="stack">
+            {completedItems.length === 0 ? (
+              <p className="empty">No completed history yet.</p>
+            ) : (
+              completedItems.map((item) => (
+                <div key={item.id} className="history-row">
+                  <span>{asItemTitle(item)}</span>
+                  <span>
+                    {getItemCompletedAt(item) ? formatDate(getItemCompletedAt(item) as string) : "n/a"}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
 
-              <div className="stack">
-                {userProfiles.map((profile) => {
-                  const active = getActiveItem(state.items, profile.id);
-                  const waiting = getWaitingItems(state.items, profile.id);
-                  const completed = state.items
-                    .filter((item) => item.ownerId === profile.id && item.state === "completed")
-                    .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
-                    .slice(0, 3);
-
-                  return (
-                    <div key={profile.id} className="visibility-card">
-                      <h3>{profile.name}</h3>
-                      <p>
-                        <strong>Active:</strong> {active ? active.title : "None"}
-                      </p>
-                      <p>
-                        <strong>Waiting:</strong> {waiting.length === 0 ? "None" : waiting.map((item) => item.title).join(" | ")}
-                      </p>
-                      <p>
-                        <strong>Recent Completed:</strong>{" "}
-                        {completed.length === 0 ? "None" : completed.map((item) => item.title).join(" | ")}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
+        <section className="panel">
+          <h2>Team Visibility (Read-Only)</h2>
+          {teamProfiles.length === 0 ? (
+            <p className="empty">No user profiles found.</p>
           ) : (
-            <p className="empty">Read-only team visibility is available only while acting as an admin.</p>
+            <div className="stack">
+              {teamProfiles.map((profile) => {
+                const profileItems = items.filter((item) => getItemOwnerId(item) === profile.id);
+                const profileActive = profileItems.find((item) => getItemState(item) === "active");
+                const profileWaiting = [...profileItems]
+                  .filter((item) => getItemState(item) === "waiting")
+                  .sort(
+                    (a, b) =>
+                      (getItemWaitingPosition(a) ?? Number.MAX_SAFE_INTEGER) -
+                      (getItemWaitingPosition(b) ?? Number.MAX_SAFE_INTEGER)
+                  );
+                const profileCompleted = sortByCompletedAtDesc(
+                  profileItems.filter((item) => getItemState(item) === "completed")
+                ).slice(0, 3);
+
+                return (
+                  <div key={profile.id} className="visibility-card">
+                    <h3>{asDisplayName(profile)}</h3>
+                    <p>
+                      <strong>Active:</strong> {profileActive ? asItemTitle(profileActive) : "None"}
+                    </p>
+                    <p>
+                      <strong>Waiting:</strong>{" "}
+                      {profileWaiting.length === 0
+                        ? "None"
+                        : profileWaiting.map((item) => asItemTitle(item)).join(" | ")}
+                    </p>
+                    <p>
+                      <strong>Recent Completed:</strong>{" "}
+                      {profileCompleted.length === 0
+                        ? "None"
+                        : profileCompleted.map((item) => asItemTitle(item)).join(" | ")}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </section>
       </main>
