@@ -1,119 +1,11 @@
+import { getSupabaseServerClient } from "../supabase/server"
+
 type FocusItem = {
   id: string
   state: string
   execution_owner_id: string
   waiting_position: number | null
   [key: string]: unknown
-}
-
-type SupabaseQueryResult<T> = {
-  data: T | null
-  error: { message: string } | null
-}
-
-type SupabaseClientLike = {
-  from: (table: string) => {
-    select: (columns: string) => {
-      eq: (column: string, value: unknown) => unknown
-      order: (column: string, options?: { ascending?: boolean }) => unknown
-      limit: (count: number) => unknown
-      maybeSingle: () => Promise<SupabaseQueryResult<FocusItem>>
-    }
-    update: (values: Record<string, unknown>) => {
-      eq: (column: string, value: unknown) => {
-        eq: (column: string, value: unknown) => {
-          select: (columns: string) => {
-            maybeSingle: () => Promise<SupabaseQueryResult<FocusItem>>
-          }
-        }
-      }
-    }
-  }
-}
-
-type TransactionRunner = <T>(
-  callback: (client: SupabaseClientLike) => Promise<T>
-) => Promise<T>
-
-type SupabaseModuleLike = {
-  withTransaction?: TransactionRunner
-  runInTransaction?: TransactionRunner
-  getSupabaseServerClient?: () => SupabaseClientLike
-  createServerClient?: () => SupabaseClientLike
-  createClient?: () => SupabaseClientLike
-  supabase?: SupabaseClientLike
-  client?: SupabaseClientLike
-}
-
-const SERVER_CLIENT_MODULE_CANDIDATES = [
-  "../supabase/server",
-  "../../src/lib/supabase/server",
-  "../../lib/supabase/server",
-  "../supabase/client",
-  "../../src/lib/supabase/client",
-  "../../lib/supabase/client",
-]
-
-async function loadSupabaseModule(): Promise<SupabaseModuleLike> {
-  for (const candidate of SERVER_CLIENT_MODULE_CANDIDATES) {
-    try {
-      const loaded = (await import(candidate)) as SupabaseModuleLike
-      return loaded
-    } catch {
-      // Try the next candidate.
-    }
-  }
-
-  throw new Error(
-    "Supabase server client utility was not found. Expected a module such as src/lib/supabase/server."
-  )
-}
-
-function resolveSupabaseClient(mod: SupabaseModuleLike): SupabaseClientLike {
-  if (mod.getSupabaseServerClient) {
-    return mod.getSupabaseServerClient()
-  }
-
-  if (mod.createServerClient) {
-    return mod.createServerClient()
-  }
-
-  if (mod.createClient) {
-    return mod.createClient()
-  }
-
-  if (mod.supabase) {
-    return mod.supabase
-  }
-
-  if (mod.client) {
-    return mod.client
-  }
-
-  throw new Error(
-    "No Supabase client export found. Expected getSupabaseServerClient, createServerClient, createClient, supabase, or client."
-  )
-}
-
-function resolveTransactionRunner(
-  mod: SupabaseModuleLike,
-  client: SupabaseClientLike
-): TransactionRunner {
-  if (!client || typeof client.from !== "function") {
-    throw new Error("Supabase client is invalid or missing the query interface.")
-  }
-
-  if (mod.withTransaction) {
-    return mod.withTransaction
-  }
-
-  if (mod.runInTransaction) {
-    return mod.runInTransaction
-  }
-
-  throw new Error(
-    "No transaction helper export found. acceptItem requires withTransaction or runInTransaction from your Supabase server utility."
-  )
 }
 
 function requireString(value: string, fieldName: string): string {
@@ -134,81 +26,73 @@ export async function acceptItem({
   const normalizedItemId = requireString(itemId, "itemId")
   const normalizedUserId = requireString(userId, "userId")
 
-  const supabaseModule = await loadSupabaseModule()
-  const supabaseClient = resolveSupabaseClient(supabaseModule)
-  const withTransaction = resolveTransactionRunner(supabaseModule, supabaseClient)
+  const supabase = getSupabaseServerClient()
 
-  return withTransaction(async (tx) => {
-    const itemQuery = tx.from("items").select("*").eq("id", normalizedItemId)
-    const itemResult = await (itemQuery as { maybeSingle: () => Promise<SupabaseQueryResult<FocusItem>> }).maybeSingle()
+  const { data: item, error: itemError } = await supabase
+    .from("items")
+    .select("*")
+    .eq("id", normalizedItemId)
+    .maybeSingle()
 
-    if (itemResult.error) {
-      throw new Error(`Failed to load item "${normalizedItemId}": ${itemResult.error.message}`)
-    }
+  if (itemError) {
+    throw new Error(`Failed to load item "${normalizedItemId}": ${itemError.message}`)
+  }
 
-    const item = itemResult.data
+  if (!item) {
+    throw new Error(`Item "${normalizedItemId}" does not exist.`)
+  }
 
-    if (!item) {
-      throw new Error(`Item "${normalizedItemId}" does not exist.`)
-    }
+  if (item.state !== "offered") {
+    throw new Error(
+      `Illegal transition for item "${normalizedItemId}": expected state "offered" but found "${item.state}".`
+    )
+  }
 
-    if (item.state !== "offered") {
-      throw new Error(
-        `Illegal transition for item "${normalizedItemId}": expected state "offered" but found "${item.state}".`
-      )
-    }
+  if (item.execution_owner_id !== normalizedUserId) {
+    throw new Error(
+      `Item "${normalizedItemId}" is owned by "${item.execution_owner_id}", not "${normalizedUserId}".`
+    )
+  }
 
-    if (item.execution_owner_id !== normalizedUserId) {
-      throw new Error(
-        `Item "${normalizedItemId}" is owned by "${item.execution_owner_id}", not "${normalizedUserId}".`
-      )
-    }
+  const { data: highestWaitingItem, error: waitingError } = await supabase
+    .from("items")
+    .select("waiting_position")
+    .eq("execution_owner_id", normalizedUserId)
+    .eq("state", "waiting")
+    .order("waiting_position", { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
-    const waitingQuery = tx
-      .from("items")
-      .select("waiting_position")
-      .eq("execution_owner_id", normalizedUserId)
-      .eq("state", "waiting")
-      .order("waiting_position", { ascending: false })
-      .limit(1)
+  if (waitingError) {
+    throw new Error(
+      `Failed to determine next waiting position for user "${normalizedUserId}": ${waitingError.message}`
+    )
+  }
 
-    const waitingResult = await (waitingQuery as {
-      maybeSingle: () => Promise<SupabaseQueryResult<Pick<FocusItem, "waiting_position">>>
-    }).maybeSingle()
+  const currentMaxWaitingPosition = highestWaitingItem?.waiting_position ?? 0
+  const nextWaitingPosition = currentMaxWaitingPosition + 1
 
-    if (waitingResult.error) {
-      throw new Error(
-        `Failed to determine next waiting position for user "${normalizedUserId}": ${waitingResult.error.message}`
-      )
-    }
+  const { data: updatedItem, error: updateError } = await supabase
+    .from("items")
+    .update({
+      state: "waiting",
+      waiting_position: nextWaitingPosition,
+    })
+    .eq("id", normalizedItemId)
+    .eq("state", "offered")
+    .eq("execution_owner_id", normalizedUserId)
+    .select("*")
+    .maybeSingle()
 
-    const currentMax = waitingResult.data?.waiting_position ?? 0
-    const nextWaitingPosition = currentMax + 1
+  if (updateError) {
+    throw new Error(`Failed to accept item "${normalizedItemId}": ${updateError.message}`)
+  }
 
-    const updateResult = await tx
-      .from("items")
-      .update({
-        state: "waiting",
-        waiting_position: nextWaitingPosition,
-      })
-      .eq("id", normalizedItemId)
-      .eq("state", "offered")
-      .eq("execution_owner_id", normalizedUserId)
-      .select("*")
-      .maybeSingle()
+  if (!updatedItem) {
+    throw new Error(
+      `Item "${normalizedItemId}" could not be accepted because its state or ownership changed during the transaction.`
+    )
+  }
 
-    if (updateResult.error) {
-      throw new Error(
-        `Failed to accept item "${normalizedItemId}": ${updateResult.error.message}`
-      )
-    }
-
-    if (!updateResult.data) {
-      throw new Error(
-        `Item "${normalizedItemId}" could not be accepted because its state or ownership changed during the transaction.`
-      )
-    }
-
-    return updateResult.data
-  })
+  return updatedItem as FocusItem
 }
