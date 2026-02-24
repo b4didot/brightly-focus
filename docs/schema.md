@@ -359,3 +359,52 @@ Advisory alarm scoped to execution session
 No behavioral pressure encoded in schema
 
 The system is mechanically enforceable and aligned with the Domain Model.
+
+11. Structural Context Additions (Current Contract)
+
+Projects include additional contextual fields:
+
+- `visibility_scope` TEXT NOT NULL DEFAULT `team`
+  - Allowed values: `team`, `personal`
+- `description` TEXT NULL
+- `due_at` TIMESTAMPTZ NULL
+
+Milestones include:
+
+- `description` TEXT NULL
+
+Indexing:
+
+- `idx_projects_team_scope_created_at` on `(team_id, visibility_scope, created_at DESC)`
+
+Behavior notes:
+
+- `due_at` is contextual metadata only; it does not affect execution lifecycle.
+- Default analytics/reporting datasets must filter `projects.visibility_scope = 'team'`.
+- Projects and milestones keep canonical DB field `name`; UI may label it as Title.
+
+12. Deletion Enforcement (Application Layer)
+
+Current deletion contract:
+
+- Project deletion: allowed only for `projects.visibility_scope = 'personal'`.
+- Milestone deletion: allowed only when parent project scope is `personal`.
+- Team-scope structures are non-deletable in application paths.
+
+Item deletion constraints in application:
+
+- Allowed only for owner-owned items in `offered` or `waiting` states.
+- Blocked for `active` and `completed` states.
+- Blocked when item is referenced by another row via `origin_item_id`.
+
+Cascade cleanup order for deletable items:
+
+1. `active_focus_sessions` by `item_id`
+2. `item_tags` by `item_id`
+3. `steps` by `item_id`
+4. `items`
+
+Post-delete consistency:
+
+- Normalize waiting queue for affected owners when waiting items are deleted.
+- Revalidate route views (`/focus`, `/projects`, `/milestones`) after successful deletes.

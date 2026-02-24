@@ -42,3 +42,19 @@ Denied:
 - `waiting_position` must be null for non-waiting items.
 - `completed_at` is required for completed items and null otherwise.
 - Origin/rework references must not mutate completed history.
+
+## Deletion Invariants (Personal Scope)
+
+- Deletion of Projects and Milestones is allowed only for `visibility_scope = 'personal'`.
+- Team-scope Projects and Milestones must not expose delete actions in UI.
+- Personal Project/Milestone delete requires the acting user to be the personal owner (`projects.default_user_id`).
+- Direct Item deletion is allowed only for item owner and only when state is `offered` or `waiting`.
+- `active` and `completed` items are never deletable by this flow.
+- Items referenced by `origin_item_id` are never deletable.
+- Cascade deletion must remove dependent rows in this order:
+  1. `active_focus_sessions`
+  2. `item_tags`
+  3. `steps`
+  4. `items`
+- After deleting waiting items, affected owners' waiting queues must be normalized.
+- Successful deletes must revalidate `/focus`, `/projects`, and `/milestones` to avoid stale UI.

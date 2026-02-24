@@ -6,6 +6,7 @@ import {
   createUserItemAction,
   reorderWaitingItemAction,
 } from "../actions/focusActions"
+import { deleteItemAction } from "../../items/actions/itemDeleteActions"
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString(undefined, {
@@ -82,6 +83,11 @@ export function FocusBoard({ data }: { data: FocusRouteData }) {
                     <input type="hidden" name="itemId" value={item.id} />
                     <button type="submit">Accept</button>
                   </form>
+                  <form action={deleteItemAction}>
+                    <input type="hidden" name="actingUserId" value={data.selectedUserId ?? ""} />
+                    <input type="hidden" name="itemId" value={item.id} />
+                    <button type="submit">Delete</button>
+                  </form>
                 </div>
               ))
             )}
@@ -118,6 +124,11 @@ export function FocusBoard({ data }: { data: FocusRouteData }) {
                       <button type="submit" disabled={index === data.waitingItems.length - 1}>
                         Down
                       </button>
+                    </form>
+                    <form action={deleteItemAction}>
+                      <input type="hidden" name="actingUserId" value={data.selectedUserId ?? ""} />
+                      <input type="hidden" name="itemId" value={item.id} />
+                      <button type="submit">Delete</button>
                     </form>
                   </div>
                 </div>
@@ -174,6 +185,16 @@ export function FocusBoard({ data }: { data: FocusRouteData }) {
           <div className="stack">
             <a href={`/team${data.selectedUserId ? `?userId=${encodeURIComponent(data.selectedUserId)}` : ""}`}>
               Team Visibility
+            </a>
+            <a
+              href={`/projects${data.selectedUserId ? `?userId=${encodeURIComponent(data.selectedUserId)}` : ""}`}
+            >
+              Projects
+            </a>
+            <a
+              href={`/milestones${data.selectedUserId ? `?userId=${encodeURIComponent(data.selectedUserId)}` : ""}`}
+            >
+              Milestones
             </a>
             <a
               href={`/history${data.selectedUserId ? `?userId=${encodeURIComponent(data.selectedUserId)}` : ""}`}

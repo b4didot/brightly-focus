@@ -513,3 +513,25 @@ Clean separation of structure vs execution
 Advisory alarm without behavioral pressure
 
 The system remains calm, predictable, and aligned with the System Plan.
+
+14. Structure Context Fields and Scope
+
+Projects and Milestones include contextual metadata only.
+These fields do not participate in execution transitions.
+
+Project contextual fields:
+
+- `name` (UI label: Title)
+- `description`
+- `due_at` (context-only)
+- `visibility_scope` (`team` or `personal`)
+
+Milestone contextual fields:
+
+- `name` (UI label: Title)
+- `description`
+
+Same-team members may create and edit Projects and Milestones.
+This structural collaboration does not alter Focus Engine ownership or lifecycle rules.
+
+Analytics default behavior excludes `visibility_scope = 'personal'` projects unless explicitly requested.

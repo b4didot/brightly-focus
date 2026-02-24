@@ -56,12 +56,14 @@ label {
 
 select,
 input,
+textarea,
 button {
   font: inherit;
 }
 
 select,
-input {
+input,
+textarea {
   border: 1px solid var(--line);
   border-radius: 0.6rem;
   background: var(--surface);
