@@ -1,0 +1,1 @@
+export { getFocusPageView } from "./getFocusPageView"

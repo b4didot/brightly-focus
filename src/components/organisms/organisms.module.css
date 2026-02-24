@@ -1,0 +1,14 @@
+.stack {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.placeholderText {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.projectHead {
+  margin: 0;
+  font-size: 0.95rem;
+}

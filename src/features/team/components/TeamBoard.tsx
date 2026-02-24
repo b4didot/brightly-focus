@@ -1,3 +1,4 @@
+import Link from "next/link"
 import type { ItemView } from "../../items/adapters/itemAdapter"
 import type { UserView } from "../../users/adapters/userAdapter"
 
@@ -17,7 +18,7 @@ export function TeamBoard({
           <h1>Brightly: Team Visibility</h1>
           <p>Read-only visibility into team focus state.</p>
         </div>
-        <a href="/focus">Back to Focus</a>
+        <Link href="/focus">Back to Focus</Link>
       </header>
 
       <main className="layout-grid">

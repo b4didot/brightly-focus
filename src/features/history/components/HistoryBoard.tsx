@@ -1,3 +1,4 @@
+import Link from "next/link"
 import type { ItemView } from "../../items/adapters/itemAdapter"
 import type { UserView } from "../../users/adapters/userAdapter"
 
@@ -26,7 +27,7 @@ export function HistoryBoard({
           <h1>Brightly: History</h1>
           <p>Completed items feed per user.</p>
         </div>
-        <a href="/focus">Back to Focus</a>
+        <Link href="/focus">Back to Focus</Link>
       </header>
 
       <main className="layout-grid">

@@ -1,0 +1,1 @@
+export { getProjectPageView } from "./getProjectPageView"

@@ -1,0 +1,132 @@
+.pageContainer {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  gap: 0.5rem;
+  padding: 0.35rem;
+  box-sizing: border-box;
+}
+
+.mainArea {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 54px 1fr;
+  gap: 0.5rem;
+}
+
+.sidebar {
+  border: 4px solid #111;
+  background: #ededed;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-items: start;
+  justify-items: center;
+  padding: 0.35rem;
+  gap: 0.6rem;
+}
+
+.sidebarNav {
+  display: grid;
+  gap: 0.55rem;
+  width: 100%;
+}
+
+.navButton {
+  width: 100%;
+  min-height: 52px;
+  border: 4px solid #111;
+  background: #fff;
+}
+
+.topBar {
+  border: 4px solid #111;
+  background: #e7e7e7;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.splitLayout {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(230px, 28%) 1fr;
+  gap: 0.5rem;
+}
+
+.leftColumn {
+  min-height: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.rightColumn {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(120px, 27%) minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.rightTop {
+  min-height: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.rightBottom {
+  min-height: 0;
+}
+
+.section {
+  border: 4px solid #111;
+  background: #efefef;
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.6rem;
+  align-content: start;
+  min-height: 0;
+  overflow: auto;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.sectionContent {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.activeSection {
+  background: #e4e4e4;
+}
+
+@media (max-width: 960px) {
+  .pageContainer {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    grid-template-rows: auto auto;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+  }
+
+  .sidebarNav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+
+  .splitLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .leftColumn {
+    grid-auto-rows: minmax(120px, auto);
+  }
+
+  .rightColumn {
+    grid-template-rows: minmax(120px, auto) minmax(280px, auto);
+  }
+}

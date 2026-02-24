@@ -1,0 +1,37 @@
+.card {
+  border: 1px solid #111;
+  padding: 0.55rem;
+  display: grid;
+  gap: 0.45rem;
+  background: #fff;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.cardText {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.cardRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filterBar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
