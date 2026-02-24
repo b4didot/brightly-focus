@@ -42,11 +42,18 @@ export async function normalizeWaitingQueue(
   }
 
   const queue = data ?? []
+  const existingPositions = queue
+    .map((row) => row.waiting_position)
+    .filter((value): value is number => typeof value === "number")
+  const currentMin = existingPositions.length > 0 ? Math.min(...existingPositions) : 0
+  const tempBase = currentMin - queue.length - 10
+
   // Phase 1: move all waiting positions to unique negative values to avoid
   // collisions with the unique (execution_owner_id, waiting_position) index.
   for (let index = 0; index < queue.length; index += 1) {
     const row = queue[index]
-    const tempPosition = -1 * (index + 1)
+    // Choose temp values strictly below current minimum to prevent collisions.
+    const tempPosition = tempBase - index
     const { error: tempUpdateError } = await supabase
       .from("items")
       .update({ waiting_position: tempPosition })

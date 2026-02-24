@@ -3,6 +3,7 @@ import {
   acceptItemAction,
   activateItemAction,
   completeItemAction,
+  createUserItemAction,
   reorderWaitingItemAction,
 } from "../actions/focusActions"
 
@@ -122,6 +123,32 @@ export function FocusBoard({ data }: { data: FocusRouteData }) {
                 </div>
               ))
             )}
+          </div>
+
+          <div className="stack">
+            <h3>Create Item</h3>
+            <p className="empty">New items are added to the top of your waiting queue.</p>
+            <form action={createUserItemAction} className="stack">
+              <input type="hidden" name="userId" value={data.selectedUserId ?? ""} />
+              <input type="text" name="title" placeholder="Item title" maxLength={160} required />
+              <textarea
+                name="description"
+                placeholder="Description (optional)"
+                rows={3}
+                maxLength={1000}
+                style={{
+                  resize: "vertical",
+                  border: "1px solid var(--line)",
+                  borderRadius: "0.6rem",
+                  background: "var(--surface)",
+                  color: "var(--ink)",
+                  padding: "0.55rem 0.7rem",
+                }}
+              />
+              <button type="submit" className="solid" disabled={!data.selectedUserId}>
+                Add to Waiting
+              </button>
+            </form>
           </div>
         </section>
 

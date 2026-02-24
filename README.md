@@ -35,6 +35,16 @@ Focus Engine state assumptions:
 - `items.waiting_position`
 - `items.completed_at` for completed rows
 
+User profile fields:
+- `users.first_name`
+- `users.last_name`
+- `users.email_address` (unique when provided)
+- `users.mobile_number`
+
+Mobile country code support:
+- Stored as text in DB (`mobile_number`).
+- Country-code format is handled at server/application validation level.
+
 ## Core Invariants
 
 - One active item per user.

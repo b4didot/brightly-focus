@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { acceptItem } from "../../../../lib/focus-engine/acceptItem"
 import { activateItem } from "../../../../lib/focus-engine/activateItem"
 import { completeItem } from "../../../../lib/focus-engine/completeItem"
+import { createUserItem } from "../../../../lib/focus-engine/createUserItem"
 import { toFocusEngineError } from "../../../../lib/focus-engine/errors"
 import { reorderWaitingItem } from "../../../../lib/focus-engine/reorderWaitingItem"
 import { mapFocusEngineErrorToUserMessage } from "./errorMapping"
@@ -82,6 +83,22 @@ export async function reorderWaitingItemAction(formData: FormData) {
     const itemId = assertField(formData, "itemId")
     const direction = assertField(formData, "direction")
     await reorderWaitingItem({ itemId, userId, direction: direction as "up" | "down" })
+    revalidatePath("/focus")
+    redirect(toFocusPath(userId))
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error
+    }
+    throw new Error(mapFocusEngineErrorToUserMessage(toFocusEngineError(error)))
+  }
+}
+
+export async function createUserItemAction(formData: FormData) {
+  try {
+    const userId = assertField(formData, "userId")
+    const title = assertField(formData, "title")
+    const description = String(formData.get("description") ?? "").trim()
+    await createUserItem({ userId, title, description })
     revalidatePath("/focus")
     redirect(toFocusPath(userId))
   } catch (error) {

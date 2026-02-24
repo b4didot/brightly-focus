@@ -37,6 +37,7 @@ Denied:
 
 ## Data Integrity Rules
 
+- Items may be standalone (no milestone) or milestone-linked.
 - `waiting_position` must exist only for waiting items.
 - `waiting_position` must be null for non-waiting items.
 - `completed_at` is required for completed items and null otherwise.

@@ -73,6 +73,16 @@ Cannot reorder another User’s Waiting list
 
 Has optional default alarm preference
 
+Has optional profile identity fields:
+
+first_name
+
+last_name
+
+email_address
+
+mobile_number
+
 User is the unit of focus ownership.
 
 3. Structural Entities
@@ -141,7 +151,7 @@ A discrete unit of work completed by a single User.
 
 Characteristics:
 
-Belongs to exactly one Milestone
+May belong to one Milestone or be standalone
 
 Has exactly one execution owner (User)
 
@@ -270,9 +280,9 @@ Recreation creates:
 
 A new Item
 
-Same Milestone
+Same Milestone and Project when the original is milestone-linked
 
-Same Project (inherited)
+Standalone when the original is standalone
 
 Same execution owner (unless reassigned)
 
@@ -474,7 +484,7 @@ Milestones and Projects have no immutable completion state.
 
 Projects must contain at least one Milestone.
 
-Items must belong to a Milestone.
+Items may be standalone or milestone-linked.
 
 Alarm exists only during Active state.
 

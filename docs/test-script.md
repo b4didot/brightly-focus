@@ -65,3 +65,17 @@ Expected:
 Expected:
 - routes render with fallback labels.
 - no runtime crash due to missing optional display fields.
+
+## TC-07 User Creates Own Item
+
+1. Go to `/focus?userId=<userA>`.
+2. Use `Create Item` and submit title (optionally description).
+3. Verify new item appears at top of waiting queue.
+4. If user has active item, verify active item remains unchanged.
+
+Expected:
+- new item inserted with owner = userA
+- state = waiting
+- item positioned at top of waiting
+- active item is not replaced
+- item is standalone (not attached to milestone)

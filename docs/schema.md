@@ -39,6 +39,14 @@ organization_id (FK → organizations.id, NOT NULL)
 
 team_id (FK → teams.id, NULL allowed)
 
+first_name (TEXT, NULL allowed)
+
+last_name (TEXT, NULL allowed)
+
+email_address (TEXT, NULL allowed)
+
+mobile_number (TEXT, NULL allowed)
+
 role (ENUM: 'user', 'admin', NOT NULL)
 
 active_item_alarm_default (INTEGER, NULL allowed)
@@ -48,6 +56,8 @@ created_at (NOT NULL)
 Constraints:
 
 role limited to allowed values
+
+email_address unique when provided
 
 active_item_alarm_default must be one of:
 NULL, 15, 30, 60, 120, 180, 240, 300
@@ -104,7 +114,7 @@ items
 
 id (PK)
 
-milestone_id (FK → milestones.id, NOT NULL)
+milestone_id (FK → milestones.id, NULL allowed for standalone items)
 
 execution_owner_id (FK → users.id, NOT NULL)
 
@@ -128,7 +138,7 @@ Constraints:
 
 Structural
 
-milestone_id NOT NULL
+milestone_id may be NULL (standalone item) or reference an existing milestone
 
 execution_owner_id NOT NULL
 
@@ -263,9 +273,11 @@ projects
 
 Milestone Progress:
 COUNT(items WHERE state = 'completed') / COUNT(items)
+(only items linked to that milestone)
 
 Project Progress:
 COUNT(all completed items in project) / COUNT(all items in project)
+(only items linked through project milestones)
 
 If COUNT = 0:
 Progress is undefined.
@@ -309,7 +321,7 @@ Database-Level Guarantees:
 
 ✔ One Active Item per User
 ✔ Unique waiting order per User
-✔ Items must belong to Milestone
+✔ Items may be standalone or milestone-linked
 ✔ Valid state values only
 ✔ Completion timestamp consistency
 ✔ Origin cannot self-reference
