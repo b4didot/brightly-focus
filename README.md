@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Brightly: Focus
 
-## Getting Started
+Internal-alpha implementation of a constraint-first focus system.
 
-First, run the development server:
+## Environment
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Create `.env.local`:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Run
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+App routes:
+- `/focus`
+- `/team`
+- `/history`
 
-## Learn More
+## Required Data Model Expectations
 
-To learn more about Next.js, take a look at the following resources:
+Key tables used directly:
+- `users`
+- `items`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Focus Engine state assumptions:
+- `items.state` includes: `offered`, `waiting`, `active`, `completed`
+- `items.execution_owner_id`
+- `items.waiting_position`
+- `items.completed_at` for completed rows
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Core Invariants
 
-## Deploy on Vercel
+- One active item per user.
+- Assigned/offered work must be accepted to enter waiting.
+- Switching focus moves previous active to top of waiting.
+- Completing active auto-activates next waiting.
+- Completed is terminal.
+- Queue ordering is user-owned.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+See:
+- `docs/constraints.md`
+- `docs/traceability.md`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Testing Checklist
+
+Follow `docs/test-script.md` for manual end-to-end validation.
+
+## Seed Data Guidance
+
+Seed users first, then items:
+1. Insert at least one `users` row with role `user`.
+2. Insert `items` rows with `execution_owner_id` referencing user IDs.
+3. Use mixed states to test:
+   - one `active`
+   - multiple `waiting` with ordered `waiting_position`
+   - one `offered`
+   - some `completed`
+
+## Verification Flow
+
+1. Open `/focus?userId=<user-id>`
+2. Accept an offered item.
+3. Reorder waiting list.
+4. Start focus from waiting.
+5. Complete active item.
+6. Validate `/team` and `/history` views reflect updates.

@@ -1,21 +1,16 @@
 import { getSupabaseServerClient } from "../supabase/server"
+import { FocusEngineError, toFocusEngineError } from "./errors"
+import { requireNonEmptyString } from "./guards"
+import { normalizeWaitingQueue } from "./queue"
 
 type Direction = "up" | "down"
-
-function requireString(value: string, fieldName: string): string {
-  if (!value || typeof value !== "string") {
-    throw new Error(`${fieldName} is required and must be a non-empty string.`)
-  }
-
-  return value
-}
 
 function requireDirection(value: string): Direction {
   if (value === "up" || value === "down") {
     return value
   }
 
-  throw new Error(`direction must be either "up" or "down".`)
+  throw new FocusEngineError("VALIDATION_ERROR", `direction must be either "up" or "down".`)
 }
 
 export async function reorderWaitingItem({
@@ -27,127 +22,138 @@ export async function reorderWaitingItem({
   userId: string
   direction: "up" | "down"
 }) {
-  const normalizedItemId = requireString(itemId, "itemId")
-  const normalizedUserId = requireString(userId, "userId")
-  const normalizedDirection = requireDirection(direction)
-  const supabase = getSupabaseServerClient()
+  try {
+    const normalizedItemId = requireNonEmptyString(itemId, "itemId")
+    const normalizedUserId = requireNonEmptyString(userId, "userId")
+    const normalizedDirection = requireDirection(direction)
+    const supabase = getSupabaseServerClient()
 
-  const { data: queue, error: queueError } = await supabase
-    .from("items")
-    .select("id,execution_owner_id,state,waiting_position")
-    .eq("execution_owner_id", normalizedUserId)
-    .eq("state", "waiting")
-    .order("waiting_position", { ascending: true })
+    const { data: queue, error: queueError } = await supabase
+      .from("items")
+      .select("id,execution_owner_id,state,waiting_position")
+      .eq("execution_owner_id", normalizedUserId)
+      .eq("state", "waiting")
+      .order("waiting_position", { ascending: true })
 
-  if (queueError) {
-    throw new Error(
-      `Failed to load waiting queue for user "${normalizedUserId}": ${queueError.message}`
-    )
+    if (queueError) {
+      throw new FocusEngineError(
+        "DB_ERROR",
+        `Failed to load waiting queue for user "${normalizedUserId}": ${queueError.message}`
+      )
+    }
+
+    const waitingItems = queue ?? []
+    const currentIndex = waitingItems.findIndex((entry) => entry.id === normalizedItemId)
+    if (currentIndex < 0) {
+      throw new FocusEngineError(
+        "NOT_FOUND",
+        `Item "${normalizedItemId}" is not in waiting for user "${normalizedUserId}".`
+      )
+    }
+
+    const targetIndex = normalizedDirection === "up" ? currentIndex - 1 : currentIndex + 1
+    if (targetIndex < 0 || targetIndex >= waitingItems.length) {
+      throw new FocusEngineError(
+        "VALIDATION_ERROR",
+        `Cannot move item "${normalizedItemId}" ${normalizedDirection}; it is already at the queue boundary.`
+      )
+    }
+
+    const currentItem = waitingItems[currentIndex]
+    const targetItem = waitingItems[targetIndex]
+    const currentPosition = currentItem.waiting_position
+    const targetPosition = targetItem.waiting_position
+
+    if (currentPosition == null || targetPosition == null) {
+      throw new FocusEngineError(
+        "QUEUE_CONFLICT",
+        `Cannot reorder waiting queue because one or more waiting_position values are null.`,
+        true
+      )
+    }
+
+    const tempPosition = -1
+    const { data: tempMoved, error: tempError } = await supabase
+      .from("items")
+      .update({ waiting_position: tempPosition })
+      .eq("id", currentItem.id)
+      .eq("execution_owner_id", normalizedUserId)
+      .eq("state", "waiting")
+      .eq("waiting_position", currentPosition)
+      .select("id")
+      .maybeSingle()
+
+    if (tempError) {
+      throw new FocusEngineError(
+        "QUEUE_CONFLICT",
+        `Failed to begin queue reorder for item "${currentItem.id}": ${tempError.message}`,
+        true
+      )
+    }
+
+    if (!tempMoved) {
+      throw new FocusEngineError(
+        "QUEUE_CONFLICT",
+        `Queue reorder aborted because item "${currentItem.id}" changed during the operation.`,
+        true
+      )
+    }
+
+    const { data: targetMoved, error: targetError } = await supabase
+      .from("items")
+      .update({ waiting_position: currentPosition })
+      .eq("id", targetItem.id)
+      .eq("execution_owner_id", normalizedUserId)
+      .eq("state", "waiting")
+      .eq("waiting_position", targetPosition)
+      .select("id")
+      .maybeSingle()
+
+    if (targetError) {
+      throw new FocusEngineError(
+        "QUEUE_CONFLICT",
+        `Failed to move neighboring item "${targetItem.id}" during reorder: ${targetError.message}`,
+        true
+      )
+    }
+
+    if (!targetMoved) {
+      throw new FocusEngineError(
+        "QUEUE_CONFLICT",
+        `Queue reorder aborted because neighboring item "${targetItem.id}" changed during the operation.`,
+        true
+      )
+    }
+
+    const { data: updatedItem, error: updateError } = await supabase
+      .from("items")
+      .update({ waiting_position: targetPosition })
+      .eq("id", currentItem.id)
+      .eq("execution_owner_id", normalizedUserId)
+      .eq("state", "waiting")
+      .eq("waiting_position", tempPosition)
+      .select("*")
+      .maybeSingle()
+
+    if (updateError) {
+      throw new FocusEngineError(
+        "QUEUE_CONFLICT",
+        `Failed to finalize reorder for item "${currentItem.id}": ${updateError.message}`,
+        true
+      )
+    }
+
+    if (!updatedItem) {
+      throw new FocusEngineError(
+        "QUEUE_CONFLICT",
+        `Queue reorder failed to finalize because item "${currentItem.id}" changed during the operation.`,
+        true
+      )
+    }
+
+    await normalizeWaitingQueue(supabase, normalizedUserId)
+    return updatedItem
+  } catch (error) {
+    throw toFocusEngineError(error)
   }
-
-  const waitingItems = queue ?? []
-  const currentIndex = waitingItems.findIndex((entry) => entry.id === normalizedItemId)
-
-  if (currentIndex < 0) {
-    throw new Error(
-      `Item "${normalizedItemId}" is not in waiting for user "${normalizedUserId}".`
-    )
-  }
-
-  const currentItem = waitingItems[currentIndex]
-
-  if (currentItem.execution_owner_id !== normalizedUserId) {
-    throw new Error(
-      `Item "${normalizedItemId}" is owned by "${currentItem.execution_owner_id}", not "${normalizedUserId}".`
-    )
-  }
-
-  if (currentItem.state !== "waiting") {
-    throw new Error(
-      `Illegal reorder for item "${normalizedItemId}": expected state "waiting" but found "${currentItem.state}".`
-    )
-  }
-
-  const targetIndex = normalizedDirection === "up" ? currentIndex - 1 : currentIndex + 1
-  if (targetIndex < 0 || targetIndex >= waitingItems.length) {
-    throw new Error(
-      `Cannot move item "${normalizedItemId}" ${normalizedDirection}; it is already at the queue boundary.`
-    )
-  }
-
-  const targetItem = waitingItems[targetIndex]
-  const currentPosition = currentItem.waiting_position
-  const targetPosition = targetItem.waiting_position
-
-  if (currentPosition == null || targetPosition == null) {
-    throw new Error(
-      `Cannot reorder waiting queue because one or more waiting_position values are null.`
-    )
-  }
-
-  const tempPosition = -1
-
-  const { data: tempMoved, error: tempError } = await supabase
-    .from("items")
-    .update({ waiting_position: tempPosition })
-    .eq("id", currentItem.id)
-    .eq("execution_owner_id", normalizedUserId)
-    .eq("state", "waiting")
-    .eq("waiting_position", currentPosition)
-    .select("id")
-    .maybeSingle()
-
-  if (tempError) {
-    throw new Error(`Failed to begin queue reorder for item "${currentItem.id}": ${tempError.message}`)
-  }
-
-  if (!tempMoved) {
-    throw new Error(
-      `Queue reorder aborted because item "${currentItem.id}" changed during the operation.`
-    )
-  }
-
-  const { data: targetMoved, error: targetError } = await supabase
-    .from("items")
-    .update({ waiting_position: currentPosition })
-    .eq("id", targetItem.id)
-    .eq("execution_owner_id", normalizedUserId)
-    .eq("state", "waiting")
-    .eq("waiting_position", targetPosition)
-    .select("id")
-    .maybeSingle()
-
-  if (targetError) {
-    throw new Error(
-      `Failed to move neighboring item "${targetItem.id}" during reorder: ${targetError.message}`
-    )
-  }
-
-  if (!targetMoved) {
-    throw new Error(
-      `Queue reorder aborted because neighboring item "${targetItem.id}" changed during the operation.`
-    )
-  }
-
-  const { data: itemMoved, error: itemError } = await supabase
-    .from("items")
-    .update({ waiting_position: targetPosition })
-    .eq("id", currentItem.id)
-    .eq("execution_owner_id", normalizedUserId)
-    .eq("state", "waiting")
-    .eq("waiting_position", tempPosition)
-    .select("*")
-    .maybeSingle()
-
-  if (itemError) {
-    throw new Error(`Failed to finalize reorder for item "${currentItem.id}": ${itemError.message}`)
-  }
-
-  if (!itemMoved) {
-    throw new Error(
-      `Queue reorder failed to finalize because item "${currentItem.id}" changed during the operation.`
-    )
-  }
-
-  return itemMoved
 }
