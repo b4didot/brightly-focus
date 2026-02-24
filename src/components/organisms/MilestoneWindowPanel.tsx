@@ -10,7 +10,7 @@ interface MilestoneWindowPanelProps {
 
 export function MilestoneWindowPanel({ milestone, title = "Milestone Panel" }: MilestoneWindowPanelProps) {
   return (
-    <SectionContainer title={title}>
+    <SectionContainer title={title} tone="context">
       {milestone ? <MilestoneCard milestone={milestone} /> : <p className={styles.placeholderText}>No milestone linked.</p>}
     </SectionContainer>
   )

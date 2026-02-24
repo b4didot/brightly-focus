@@ -20,7 +20,9 @@ export function SplitLayout({
     <section className={styles.splitLayout}>
       <div className={styles.leftColumn} style={{ gridTemplateRows: leftRowTemplate }}>
         {leftSections.map((section, index) => (
-          <div key={index}>{section}</div>
+          <div key={index} className={styles.splitCell}>
+            {section}
+          </div>
         ))}
       </div>
       <div className={styles.rightColumn}>
@@ -29,10 +31,14 @@ export function SplitLayout({
           style={{ gridTemplateColumns: `repeat(${rightTopColumns}, minmax(0, 1fr))` }}
         >
           {rightTopSections.map((section, index) => (
-            <div key={index}>{section}</div>
+            <div key={index} className={styles.splitCell}>
+              {section}
+            </div>
           ))}
         </div>
-        <div className={styles.rightBottom}>{rightBottom}</div>
+        <div className={styles.rightBottom}>
+          <div className={styles.splitCell}>{rightBottom}</div>
+        </div>
       </div>
     </section>
   )

@@ -10,7 +10,7 @@ interface ItemQueuePanelProps {
 
 export function ItemQueuePanel({ title, items }: ItemQueuePanelProps) {
   return (
-    <SectionContainer title={title}>
+    <SectionContainer title={title} tone="secondary">
       <div className={styles.stack}>
         {items.map((item) => (
           <ItemCard key={item.id} item={item} />

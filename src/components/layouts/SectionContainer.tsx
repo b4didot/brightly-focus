@@ -5,15 +5,35 @@ interface SectionContainerProps {
   title: string
   children?: ReactNode
   emphasize?: boolean
+  tone?: "default" | "secondary" | "context" | "workspace"
+  scrollable?: boolean
 }
 
-export function SectionContainer({ title, children, emphasize = false }: SectionContainerProps) {
-  const className = emphasize ? `${styles.section} ${styles.activeSection}` : styles.section
+export function SectionContainer({
+  title,
+  children,
+  emphasize = false,
+  tone = "default",
+  scrollable = true,
+}: SectionContainerProps) {
+  const toneClassMap = {
+    default: "",
+    secondary: styles.secondarySection,
+    context: styles.contextSection,
+    workspace: styles.workspaceSection,
+  }
+  const className = [styles.section, emphasize ? styles.activeSection : "", toneClassMap[tone]]
+    .filter(Boolean)
+    .join(" ")
+
+  const contentClassName = [styles.sectionContent, scrollable ? "" : styles.noScroll]
+    .filter(Boolean)
+    .join(" ")
 
   return (
     <section className={className}>
       <h2 className={styles.sectionTitle}>{title}</h2>
-      <div className={styles.sectionContent}>{children}</div>
+      <div className={contentClassName}>{children}</div>
     </section>
   )
 }

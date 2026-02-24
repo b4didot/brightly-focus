@@ -10,7 +10,7 @@ interface ProjectQueuePanelProps {
 
 export function ProjectQueuePanel({ title, projects }: ProjectQueuePanelProps) {
   return (
-    <SectionContainer title={title}>
+    <SectionContainer title={title} tone="secondary">
       <div className={styles.stack}>
         {projects.map((project) => (
           <ProjectCard key={project.id} project={project} />

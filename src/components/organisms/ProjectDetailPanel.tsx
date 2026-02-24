@@ -9,7 +9,7 @@ interface ProjectDetailPanelProps {
 
 export function ProjectDetailPanel({ project }: ProjectDetailPanelProps) {
   return (
-    <SectionContainer title="Project Window">
+    <SectionContainer title="Project Window" tone="workspace">
       {project ? (
         <>
           <p className={styles.projectHead}>{project.headInfo}</p>

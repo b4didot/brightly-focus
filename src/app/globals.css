@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #f4f1e8;
-  --surface: #fffdf8;
-  --ink: #1f1b16;
-  --muted: #6f6557;
-  --line: #d7cfc1;
-  --accent: #b24d2f;
-  --accent-ink: #fff9f4;
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --ink: #e2e8f0;
+  --muted: #94a3b8;
+  --line: #334155;
+  --accent: #6366f1;
+  --accent-ink: #e2e8f0;
 }
 
 @theme inline {
@@ -19,9 +19,10 @@
 
 body {
   margin: 0;
-  background: radial-gradient(circle at top right, #fff4dc 0%, var(--bg) 45%);
+  background: var(--bg);
   color: var(--ink);
   font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
+  overflow: hidden;
 }
 
 .page-shell {
@@ -94,12 +95,13 @@ button.solid {
 
 .panel {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 1rem;
   padding: 1rem;
   display: grid;
   gap: 0.9rem;
   align-content: start;
+  box-shadow: 0 10px 24px rgba(2, 6, 23, 0.32);
 }
 
 .panel h2,
@@ -120,9 +122,9 @@ button.solid {
 .item-card,
 .inbox-card,
 .visibility-card {
-  border: 1px solid var(--line);
+  border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 0.75rem;
-  background: #fffcf6;
+  background: #111827;
   padding: 0.75rem;
   display: grid;
   gap: 0.5rem;
@@ -156,7 +158,7 @@ button.solid {
   border: 1px solid var(--line);
   border-radius: 0.75rem;
   padding: 0.75rem;
-  background: #fffaf1;
+  background: #111827;
 }
 
 .empty {
@@ -172,7 +174,7 @@ button.solid {
   padding: 0.45rem 0.6rem;
   border: 1px solid var(--line);
   border-radius: 0.6rem;
-  background: #fffcf6;
+  background: #111827;
 }
 
 .warn {

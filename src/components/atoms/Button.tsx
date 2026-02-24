@@ -7,6 +7,7 @@ interface ButtonProps {
   onClick?: () => void
   type?: "button" | "submit"
   variant?: ButtonVariant
+  disabled?: boolean
 }
 
 export function Button({
@@ -14,12 +15,13 @@ export function Button({
   onClick,
   type = "button",
   variant = "primary",
+  disabled = false,
 }: ButtonProps) {
   const className =
     variant === "secondary" ? `${styles.button} ${styles.secondary}` : styles.button
 
   return (
-    <button className={className} type={type} onClick={onClick}>
+    <button className={className} type={type} onClick={onClick} disabled={disabled}>
       {label}
     </button>
   )

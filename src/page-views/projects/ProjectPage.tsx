@@ -16,7 +16,7 @@ export function ProjectPage() {
       }
     >
       <SplitLayout
-        leftRowTemplate="1fr 1fr"
+        leftRowTemplate="minmax(168px, 28%) minmax(0, 1fr)"
         leftSections={[
           <ProjectQueuePanel key="team" title="Team Project Queue" projects={data.teamProjects} />,
           <ProjectQueuePanel key="personal" title="Personal Project Queue" projects={data.personalProjects} />,

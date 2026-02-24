@@ -22,7 +22,7 @@ export function ItemPage() {
       }
     >
       <SplitLayout
-        leftRowTemplate="1fr 1fr"
+        leftRowTemplate="minmax(168px, 28%) minmax(0, 1fr)"
         leftSections={[
           <ItemQueuePanel key="queue" title="Active + waiting queue" items={data.queueItems} />,
           <CompletedListPanel key="completed" items={data.completedItems} />,

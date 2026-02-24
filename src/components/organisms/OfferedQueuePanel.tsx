@@ -9,7 +9,7 @@ interface OfferedQueuePanelProps {
 
 export function OfferedQueuePanel({ items }: OfferedQueuePanelProps) {
   return (
-    <SectionContainer title="Request Queue (Offer)">
+    <SectionContainer title="Request Queue (Offer)" tone="secondary">
       <div className={styles.stack}>
         {items.map((item) => (
           <ItemCard key={item.id} item={item} />

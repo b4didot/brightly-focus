@@ -11,7 +11,7 @@ interface CompletedListPanelProps {
 
 export function CompletedListPanel({ items, onRecreate }: CompletedListPanelProps) {
   return (
-    <SectionContainer title="Completed Items">
+    <SectionContainer title="Completed Items" tone="secondary">
       <div className={styles.stack}>
         {items.map((item) => (
           <ItemCard

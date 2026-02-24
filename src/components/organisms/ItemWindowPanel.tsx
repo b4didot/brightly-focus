@@ -9,7 +9,7 @@ interface ItemWindowPanelProps {
 
 export function ItemWindowPanel({ item }: ItemWindowPanelProps) {
   return (
-    <SectionContainer title="Item Window">
+    <SectionContainer title="Item Window" tone="workspace">
       {item ? <ItemCard item={item} /> : <p className={styles.placeholderText}>No item selected.</p>}
     </SectionContainer>
   )
