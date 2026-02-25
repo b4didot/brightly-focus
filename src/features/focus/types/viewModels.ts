@@ -10,3 +10,12 @@ export type FocusRouteData = {
   waitingItems: ItemView[]
   completedItems: ItemView[]
 }
+
+export type EnrichedItemData = {
+  itemId: string
+  projectName?: string
+  milestoneName?: string
+  tags: string[]
+  stepsCount: number
+  alarmLabel?: string
+}

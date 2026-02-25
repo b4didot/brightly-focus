@@ -1,13 +1,15 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 import { ArrowDownToDot, ArrowUpFromDot, Trash2 } from "lucide-react"
 import { Button, InputField, Label } from "@/components/atoms"
 import type { FilterOption, Project, SortingOption } from "@/types"
 import styles from "./molecules.module.css"
 
-type AddItemAction = (formData: FormData) => void | Promise<void>
+type AddItemAction = (
+  formData: FormData
+) => void | Promise<void> | Promise<{ success: boolean; [key: string]: unknown }>
 
 interface AddItemConfig {
   userId: string | null
@@ -91,12 +93,31 @@ export function FilterBar({
   selectedSortingId,
   addItem,
 }: FilterBarProps) {
+  const [isPending, startTransition] = useTransition()
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
   const [draft, setDraft] = useState<DraftItemState>(toInitialDraft(addItem?.selfUserId ?? null))
   const [steps, setSteps] = useState<DraftStepState[]>([])
   const filterValue = selectedFilterId ?? filters[0]?.id ?? ""
   const sortingValue = selectedSortingId ?? sorting?.[0]?.id ?? ""
+
+  function handleCreateItemSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!addItem?.action) return
+
+    const action = addItem.action
+    startTransition(async () => {
+      try {
+        const formData = new FormData(e.currentTarget)
+        await action(formData)
+        setDraft(toInitialDraft(addItem.selfUserId))
+        setSteps([])
+        setIsAddOpen(false)
+      } catch (error) {
+        console.error("Failed to create item:", error)
+      }
+    })
+  }
 
   const initialDraft = useMemo(() => toInitialDraft(addItem?.selfUserId ?? null), [addItem?.selfUserId])
   const initialSteps = useMemo<DraftStepState[]>(() => [], [])
@@ -188,7 +209,7 @@ export function FilterBar({
                 </button>
 
                 <h4 className={styles.popTitle}>Create Item</h4>
-                <form action={addItem.action} className={styles.popForm}>
+                <form onSubmit={handleCreateItemSubmit} className={styles.popForm}>
                   <input type="hidden" name="userId" value={addItem.userId ?? ""} />
 
                   <label className={styles.fieldLabel}>
@@ -441,7 +462,7 @@ export function FilterBar({
                     <Button
                       label="Add"
                       type="submit"
-                      disabled={!addItem.userId || !draft.name.trim()}
+                      disabled={!addItem.userId || !draft.name.trim() || isPending}
                       className={styles.modalActionButton}
                     />
                     <Button

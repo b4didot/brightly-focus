@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache"
 import { getSupabaseServerClient } from "../../../../lib/supabase/server"
 import { toItemView, type DbItem } from "../../items/adapters/itemAdapter"
 import { toUserView, type DbUser } from "../../users/adapters/userAdapter"
@@ -7,7 +8,7 @@ function sortByCompletedAtDesc(items: ReturnType<typeof toItemView>[]) {
   return [...items].sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
 }
 
-export async function getFocusRouteData(userId?: string): Promise<FocusRouteData> {
+async function _getFocusRouteDataImpl(userId?: string): Promise<FocusRouteData> {
   const supabase = getSupabaseServerClient()
 
   const { data: usersData, error: usersError } = await supabase.from("users").select("*")
@@ -21,15 +22,19 @@ export async function getFocusRouteData(userId?: string): Promise<FocusRouteData
   const selectedUserId =
     userId && users.some((user) => user.id === userId) ? userId : (users[0]?.id ?? null)
 
-  const { data: itemsData, error: itemsError } = await supabase.from("items").select("*")
+  // Only fetch items for the selected user (if one is selected)
+  let itemsQuery = supabase.from("items").select("*")
+  if (selectedUserId) {
+    itemsQuery = itemsQuery.eq("execution_owner_id", selectedUserId)
+  }
+
+  const { data: itemsData, error: itemsError } = await itemsQuery
   if (itemsError) {
     throw new Error(`Failed to load items: ${itemsError.message}`)
   }
 
   const items = ((itemsData ?? []) as DbItem[]).map(toItemView)
-  const selectedItems = selectedUserId
-    ? items.filter((item) => item.ownerId === selectedUserId)
-    : []
+  const selectedItems = items // Already filtered by user at database level
 
   const activeItem = selectedItems.find((item) => item.state === "active") ?? null
   const offeredItems = [...selectedItems]
@@ -60,3 +65,9 @@ export async function getFocusRouteData(userId?: string): Promise<FocusRouteData
     completedItems,
   }
 }
+
+// Cached version with revalidation tag for server actions
+export const getFocusRouteData = unstable_cache(_getFocusRouteDataImpl, ["focus-route-data"], {
+  revalidate: 3600, // Fallback cache time: 1 hour
+  tags: ["focus-route-data"],
+})
