@@ -50,6 +50,13 @@
   width: 100%;
 }
 
+.sidebarLogo {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  display: block;
+}
+
 .navButton {
   width: 100%;
   min-height: 56px;
@@ -100,7 +107,7 @@
 .rightColumn {
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(168px, 28%) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 30fr) minmax(0, 70fr);
   gap: 1rem;
   overflow: hidden;
 }

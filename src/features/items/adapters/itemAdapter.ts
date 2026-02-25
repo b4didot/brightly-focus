@@ -10,6 +10,8 @@ export type DbItem = {
   milestone_id?: string | null
   waiting_position?: number | null
   queue_order?: number | null
+  due_at?: string | null
+  dueAt?: string | null
   completed_at?: string | null
   completedAt?: string | null
   [key: string]: unknown
@@ -24,6 +26,7 @@ export type ItemView = {
   projectId: string | null
   milestoneId: string | null
   waitingPosition: number | null
+  dueAt: string | null
   completedAt: string | null
 }
 
@@ -37,6 +40,7 @@ export function toItemView(item: DbItem): ItemView {
     projectId: item.project_id ?? null,
     milestoneId: item.milestone_id ?? null,
     waitingPosition: item.waiting_position ?? item.queue_order ?? null,
+    dueAt: item.due_at ?? item.dueAt ?? null,
     completedAt: item.completed_at ?? item.completedAt ?? null,
   }
 }

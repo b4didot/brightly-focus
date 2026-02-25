@@ -30,6 +30,9 @@ export async function FocusPage({
             addItem={{
               userId: data.selectedUserId,
               action: createUserItemAction,
+              projects: data.availableProjects,
+              assignees: data.availableAssignees,
+              selfUserId: data.selectedUserId,
             }}
           />
         </TopBar>

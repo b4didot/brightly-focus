@@ -1,8 +1,6 @@
 import { ItemCard } from "@/components/molecules"
 import { SectionContainer } from "@/components/layouts"
 import type { Item } from "@/types"
-import { completeItemAction } from "@/features/focus/actions/focusActions"
-import styles from "./organisms.module.css"
 
 interface ActiveItemPanelProps {
   item: Item | null
@@ -11,6 +9,31 @@ interface ActiveItemPanelProps {
 }
 
 export function ActiveItemPanel({ item, selectedUserId, selectedItemId }: ActiveItemPanelProps) {
+  function truncate(value: string | undefined, max: number) {
+    if (!value || value.trim().length === 0) {
+      return "n/a"
+    }
+    return value.length > max ? `${value.slice(0, max - 3)}...` : value
+  }
+
+  function formatDueDateTime(value: string | undefined) {
+    if (!value) {
+      return "n/a"
+    }
+
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) {
+      return value
+    }
+
+    return parsed.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    })
+  }
+
   const selectHref = item
     ? `/focus?${new URLSearchParams({
         ...(selectedUserId ? { userId: selectedUserId } : {}),
@@ -26,15 +49,16 @@ export function ActiveItemPanel({ item, selectedUserId, selectedItemId }: Active
           fillHeight
           selectHref={selectHref}
           isSelected={item.id === selectedItemId}
-          action={
-            <form action={completeItemAction} className={styles.actionRow}>
-              <input type="hidden" name="userId" value={selectedUserId ?? ""} />
-              <input type="hidden" name="itemId" value={item.id} />
-              <button className={styles.actionButton} type="submit" disabled={!selectedUserId}>
-                Complete
-              </button>
-            </form>
-          }
+          headerPills={[
+            { icon: "project", text: truncate(item.projectName, 20) },
+            { icon: "milestone", text: truncate(item.milestoneName, 20) },
+          ]}
+          bottomMeta={[
+            { icon: "tags", value: item.tags && item.tags.length > 0 ? item.tags.join(", ") : "No tags" },
+            { icon: "alarm", value: item.alarmLabel ?? "No alarm" },
+            { icon: "datetime", value: formatDueDateTime(item.dueDateTime) },
+            { icon: "steps", value: String(item.stepsCount ?? 0) },
+          ]}
         />
       ) : (
         <p>No active item.</p>

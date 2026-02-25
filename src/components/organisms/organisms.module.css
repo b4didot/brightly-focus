@@ -18,7 +18,13 @@
 .actionRow {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.35rem;
+}
+
+.actionRow form {
+  display: inline-flex;
+  align-items: center;
 }
 
 .actionButton {
@@ -40,4 +46,18 @@
 .actionButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.iconButton {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconButton svg {
+  width: 15px;
+  height: 15px;
 }

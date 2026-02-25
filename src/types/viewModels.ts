@@ -15,6 +15,8 @@ export interface SortingOption {
 export interface FocusPageViewData {
   filters: FilterOption[]
   selectedUserId: string | null
+  availableProjects: Project[]
+  availableAssignees: FilterOption[]
   activeItem: Item | null
   waitingItems: Item[]
   offeredItems: Item[]

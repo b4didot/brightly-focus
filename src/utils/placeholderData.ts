@@ -77,6 +77,8 @@ const items: Item[] = [
 export const focusPagePlaceholderData: FocusPageViewData = {
   filters: [{ id: "all", label: "All" }],
   selectedUserId: "all",
+  availableProjects: projects,
+  availableAssignees: [{ id: "all", label: "Self" }],
   activeItem: items[0],
   waitingItems: [items[1]],
   offeredItems: [items[2]],
