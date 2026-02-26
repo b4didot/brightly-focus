@@ -1,6 +1,6 @@
 "use server"
 
-import { revalidateTag } from "next/cache"
+import { revalidatePath } from "next/cache"
 import { getSupabaseServerClient } from "../../../../lib/supabase/server"
 import { acceptItem } from "../../../../lib/focus-engine/acceptItem"
 import { activateItem } from "../../../../lib/focus-engine/activateItem"
@@ -34,7 +34,8 @@ export async function acceptItemAction(formData: FormData) {
     const userId = assertField(formData, "userId")
     const itemId = assertField(formData, "itemId")
     await acceptItem({ itemId, userId })
-    revalidateTag("focus-route-data")
+    // Invalidate cache so future refetches get fresh data
+    revalidatePath("/focus")
     return { success: true, userId, itemId }
   } catch (error) {
     if (isNextRedirectError(error)) {
@@ -49,7 +50,8 @@ export async function activateItemAction(formData: FormData) {
     const userId = assertField(formData, "userId")
     const itemId = assertField(formData, "itemId")
     await activateItem({ itemId, userId })
-    revalidateTag("focus-route-data")
+    // Invalidate cache so future refetches get fresh data
+    revalidatePath("/focus")
     return { success: true, userId, itemId }
   } catch (error) {
     if (isNextRedirectError(error)) {
@@ -64,7 +66,8 @@ export async function completeItemAction(formData: FormData) {
     const userId = assertField(formData, "userId")
     const itemId = assertField(formData, "itemId")
     await completeItem({ itemId, userId })
-    revalidateTag("focus-route-data")
+    // Invalidate cache so future refetches get fresh data
+    revalidatePath("/focus")
     return { success: true, userId, itemId }
   } catch (error) {
     if (isNextRedirectError(error)) {
@@ -80,7 +83,8 @@ export async function reorderWaitingItemAction(formData: FormData) {
     const itemId = assertField(formData, "itemId")
     const direction = assertField(formData, "direction")
     await reorderWaitingItem({ itemId, userId, direction: direction as "up" | "down" })
-    revalidateTag("focus-route-data")
+    // Invalidate cache so future refetches get fresh data
+    revalidatePath("/focus")
     return { success: true, userId, itemId, direction }
   } catch (error) {
     if (isNextRedirectError(error)) {
@@ -96,7 +100,8 @@ export async function createUserItemAction(formData: FormData) {
     const title = assertField(formData, "title")
     const description = String(formData.get("description") ?? "").trim()
     await createUserItem({ userId, title, description })
-    revalidateTag("focus-route-data")
+    // Invalidate cache so future refetches get fresh data
+    revalidatePath("/focus")
     return { success: true, userId, title, description }
   } catch (error) {
     if (isNextRedirectError(error)) {

@@ -38,7 +38,8 @@ export async function deleteItemAction(formData: FormData) {
     revalidatePath("/focus")
     revalidatePath("/projects")
     revalidatePath("/milestones")
-    redirect(toFocusPath(actingUserId))
+    // Return success without redirecting - optimistic client update already removed the item
+    return { success: true, actingUserId, itemId }
   } catch (error) {
     if (isNextRedirectError(error)) {
       throw error

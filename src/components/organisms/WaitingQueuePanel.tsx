@@ -1,10 +1,8 @@
 "use client"
 
-import { useTransition, useState, useEffect } from "react"
 import { ItemCard } from "@/components/molecules"
 import { SectionContainer } from "@/components/layouts"
 import type { Item } from "@/types"
-import { activateItemAction, reorderWaitingItemAction } from "@/features/focus/actions/focusActions"
 import { ArrowDownToDot, ArrowUpFromDot, CirclePlay } from "lucide-react"
 import styles from "./organisms.module.css"
 
@@ -12,20 +10,21 @@ interface WaitingQueuePanelProps {
   items: Item[]
   selectedUserId: string | null
   selectedItemId: string | null
+  onActivate: (itemId: string) => void
+  onReorder: (itemId: string, direction: "up" | "down") => void
+  error?: string | null
+  isPending?: boolean
 }
 
-export function WaitingQueuePanel({ items, selectedUserId, selectedItemId }: WaitingQueuePanelProps) {
-  const [isPending, startTransition] = useTransition()
-  const [waitingItems, setWaitingItems] = useState(items)
-  const [error, setError] = useState<string | null>(null)
-  const [processingItemId, setProcessingItemId] = useState<string | null>(null)
-
-  // Sync state when items or selectedUserId changes (e.g., when switching focus to a different user)
-  useEffect(() => {
-    setWaitingItems(items)
-    setError(null)
-    setProcessingItemId(null)
-  }, [selectedUserId, items])
+export function WaitingQueuePanel({
+  items,
+  selectedUserId,
+  selectedItemId,
+  onActivate,
+  onReorder,
+  error = null,
+  isPending = false,
+}: WaitingQueuePanelProps) {
 
   function truncate(value: string | undefined, max: number) {
     if (!value || value.trim().length === 0) {
@@ -43,70 +42,6 @@ export function WaitingQueuePanel({ items, selectedUserId, selectedItemId }: Wai
     return `/focus?${params.toString()}`
   }
 
-  function handleActivate(itemId: string) {
-    // Save previous state for rollback
-    const previousWaiting = waitingItems
-
-    // Remove the activated item from waiting queue
-    const newWaiting = waitingItems.filter((item) => item.id !== itemId)
-    setWaitingItems(newWaiting)
-    setError(null)
-    setProcessingItemId(itemId)
-
-    startTransition(async () => {
-      try {
-        const formData = new FormData()
-        formData.append("userId", selectedUserId ?? "")
-        formData.append("itemId", itemId)
-        await activateItemAction(formData)
-      } catch (err) {
-        // Rollback on error
-        setWaitingItems(previousWaiting)
-        setError(err instanceof Error ? err.message : "Failed to activate item")
-        console.error("Failed to activate item:", err)
-      } finally {
-        setProcessingItemId(null)
-      }
-    })
-  }
-
-  function handleReorder(itemId: string, direction: "up" | "down") {
-    // Save previous state for rollback
-    const previousWaiting = waitingItems
-
-    // Find the item and its current index
-    const currentIndex = waitingItems.findIndex((item) => item.id === itemId)
-    if (currentIndex === -1) return
-
-    // Calculate target index
-    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1
-    if (targetIndex < 0 || targetIndex >= waitingItems.length) return
-
-    // Optimistically swap items
-    const newWaiting = [...waitingItems]
-    ;[newWaiting[currentIndex], newWaiting[targetIndex]] = [newWaiting[targetIndex], newWaiting[currentIndex]]
-    setWaitingItems(newWaiting)
-    setError(null)
-    setProcessingItemId(itemId)
-
-    startTransition(async () => {
-      try {
-        const formData = new FormData()
-        formData.append("userId", selectedUserId ?? "")
-        formData.append("itemId", itemId)
-        formData.append("direction", direction)
-        await reorderWaitingItemAction(formData)
-      } catch (err) {
-        // Rollback on error
-        setWaitingItems(previousWaiting)
-        setError(err instanceof Error ? err.message : "Failed to reorder item")
-        console.error("Failed to reorder item:", err)
-      } finally {
-        setProcessingItemId(null)
-      }
-    })
-  }
-
   return (
     <SectionContainer title="Item Queue" tone="secondary">
       {error && (
@@ -115,7 +50,7 @@ export function WaitingQueuePanel({ items, selectedUserId, selectedItemId }: Wai
         </div>
       )}
       <div className={styles.stack}>
-        {waitingItems.map((item, index) => (
+        {items.map((item, index) => (
           <ItemCard
             key={item.id}
             item={item}
@@ -131,30 +66,30 @@ export function WaitingQueuePanel({ items, selectedUserId, selectedItemId }: Wai
                 <button
                   className={`${styles.actionButton} ${styles.iconButton}`}
                   type="button"
-                  disabled={!selectedUserId}
+                  disabled={!selectedUserId || isPending}
                   aria-label="Start Focus"
                   title="Start Focus"
-                  onClick={() => handleActivate(item.id)}
+                  onClick={() => onActivate(item.id)}
                 >
                   <CirclePlay strokeWidth={2.5} />
                 </button>
                 <button
                   className={`${styles.actionButton} ${styles.iconButton}`}
                   type="button"
-                  disabled={!selectedUserId || index === 0}
+                  disabled={!selectedUserId || index === 0 || isPending}
                   aria-label="Move Up"
                   title="Move Up"
-                  onClick={() => handleReorder(item.id, "up")}
+                  onClick={() => onReorder(item.id, "up")}
                 >
                   <ArrowUpFromDot strokeWidth={2.5} />
                 </button>
                 <button
                   className={`${styles.actionButton} ${styles.iconButton}`}
                   type="button"
-                  disabled={!selectedUserId || index === waitingItems.length - 1}
+                  disabled={!selectedUserId || index === items.length - 1 || isPending}
                   aria-label="Move Down"
                   title="Move Down"
-                  onClick={() => handleReorder(item.id, "down")}
+                  onClick={() => onReorder(item.id, "down")}
                 >
                   <ArrowDownToDot strokeWidth={2.5} />
                 </button>
@@ -162,7 +97,7 @@ export function WaitingQueuePanel({ items, selectedUserId, selectedItemId }: Wai
             }
           />
         ))}
-        {waitingItems.length === 0 ? <p className={styles.placeholderText}>No waiting items.</p> : null}
+        {items.length === 0 ? <p className={styles.placeholderText}>No waiting items.</p> : null}
       </div>
     </SectionContainer>
   )

@@ -1,14 +1,8 @@
 import { FilterBar } from "@/components/molecules"
-import {
-  ActiveItemPanel,
-  ItemWindowPanel,
-  MilestoneWindowPanel,
-  ProjectWindowPanel,
-  WaitingQueuePanel,
-} from "@/components/organisms"
-import { AppSidebar, PageContainer, SplitLayout, TopBar } from "@/components/layouts"
+import { AppSidebar, PageContainer, TopBar } from "@/components/layouts"
 import { createUserItemAction } from "@/features/focus/actions/focusActions"
 import { getFocusPageView } from "@/features/focus/view"
+import { FocusPageContent } from "./FocusPageContent"
 
 export async function FocusPage({
   userId,
@@ -38,27 +32,14 @@ export async function FocusPage({
         </TopBar>
       }
     >
-      <SplitLayout
-        leftRowTemplate="minmax(0, 30fr) minmax(0, 70fr)"
-        leftSections={[
-          <ActiveItemPanel
-            key="active"
-            item={data.activeItem}
-            selectedUserId={data.selectedUserId}
-            selectedItemId={data.selectedItem?.id ?? null}
-          />,
-          <WaitingQueuePanel
-            key="waiting"
-            items={data.waitingItems}
-            selectedUserId={data.selectedUserId}
-            selectedItemId={data.selectedItem?.id ?? null}
-          />,
-        ]}
-        rightTopSections={[
-          <ProjectWindowPanel key="project" project={data.selectedProject} />,
-          <MilestoneWindowPanel key="milestone" milestone={data.selectedMilestone} />,
-        ]}
-        rightBottom={<ItemWindowPanel item={data.selectedItem} />}
+      <FocusPageContent
+        activeItem={data.activeItem}
+        waitingItems={data.waitingItems}
+        selectedProject={data.selectedProject}
+        selectedMilestone={data.selectedMilestone}
+        selectedItem={data.selectedItem}
+        selectedUserId={data.selectedUserId}
+        selectedItemId={data.selectedItem?.id ?? null}
       />
     </PageContainer>
   )

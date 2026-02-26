@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { createPortal } from "react-dom"
 import { ArrowDownToDot, ArrowUpFromDot, Trash2 } from "lucide-react"
 import { Button, InputField, Label } from "@/components/atoms"
@@ -93,6 +94,7 @@ export function FilterBar({
   selectedSortingId,
   addItem,
 }: FilterBarProps) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
@@ -186,7 +188,16 @@ export function FilterBar({
     <div className={styles.filterBar}>
       <div className={styles.filterGroup}>
         <Label text="Filters" />
-        <InputField value={filterValue} options={filters} ariaLabel="Filters" />
+        <InputField 
+          value={filterValue} 
+          options={filters} 
+          ariaLabel="Filters"
+          onChange={(userId) => {
+            const params = new URLSearchParams()
+            params.set("userId", userId)
+            router.push(`/focus?${params.toString()}`)
+          }}
+        />
       </div>
       {sorting && sorting.length > 0 ? (
         <div className={styles.filterGroup}>

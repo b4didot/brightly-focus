@@ -81,27 +81,87 @@ export function FocusBoard({ data }: { data: FocusRouteData }) {
   }, [activeItem?.id, triggerEnrichment])
 
   function handleComplete(userId: string, itemId: string) {
+    // Save previous state for rollback
+    const previousActive = activeItem
+    const previousWaiting = waitingItems
+    const previousCompleted = completedItems
+
+    // 1. IMMEDIATE optimistic update
+    const completedItem = activeItem
+    if (!completedItem) return
+
+    // Promote first waiting item to active
+    const nextActive = waitingItems.length > 0 ? waitingItems[0] : null
+    const newWaiting = waitingItems.length > 0 ? waitingItems.slice(1) : []
+
+    // Add completed item to completed list
+    const newCompleted = completedItem ? [completedItem, ...completedItems] : completedItems
+
+    // Update state optimistically
+    setActiveItem(nextActive)
+    setWaitingItems(newWaiting)
+    setCompletedItems(newCompleted)
+    setError(null)
+    setProcessingItemId(itemId)
+
+    // 2. Run server action in parallel
     startTransition(async () => {
       try {
         const formData = new FormData()
         formData.append("userId", userId)
         formData.append("itemId", itemId)
         await completeItemAction(formData)
-      } catch (error) {
-        console.error("Failed to complete item:", error)
+        // 3. SUCCESS: Keep optimistic state, server confirmed it
+      } catch (err) {
+        // 4. FAILURE: Rollback on error
+        setActiveItem(previousActive)
+        setWaitingItems(previousWaiting)
+        setCompletedItems(previousCompleted)
+        setError(err instanceof Error ? err.message : "Failed to complete item")
+        console.error("Failed to complete item:", err)
+      } finally {
+        setProcessingItemId(null)
       }
     })
   }
 
   function handleAccept(userId: string, itemId: string) {
+    // Save previous state for rollback
+    const previousOffered = offeredItems
+    const previousWaiting = waitingItems
+
+    // 1. IMMEDIATE optimistic update
+    const acceptedItem = offeredItems.find((item) => item.id === itemId)
+    if (!acceptedItem) return
+
+    // Remove from offered
+    const newOffered = offeredItems.filter((item) => item.id !== itemId)
+
+    // Add to waiting
+    const newWaiting = [...waitingItems, acceptedItem]
+
+    // Update state optimistically
+    setOfferedItems(newOffered)
+    setWaitingItems(newWaiting)
+    setError(null)
+    setProcessingItemId(itemId)
+
+    // 2. Run server action in parallel
     startTransition(async () => {
       try {
         const formData = new FormData()
         formData.append("userId", userId)
         formData.append("itemId", itemId)
         await acceptItemAction(formData)
-      } catch (error) {
-        console.error("Failed to accept item:", error)
+        // 3. SUCCESS: Keep optimistic state, server confirmed it
+      } catch (err) {
+        // 4. FAILURE: Rollback on error
+        setOfferedItems(previousOffered)
+        setWaitingItems(previousWaiting)
+        setError(err instanceof Error ? err.message : "Failed to accept item")
+        console.error("Failed to accept item:", err)
+      } finally {
+        setProcessingItemId(null)
       }
     })
   }
@@ -137,6 +197,55 @@ export function FocusBoard({ data }: { data: FocusRouteData }) {
         setWaitingItems(previousWaiting)
         setError(err instanceof Error ? err.message : "Failed to activate item")
         console.error("Failed to activate item:", err)
+      } finally {
+        setProcessingItemId(null)
+      }
+    })
+  }
+
+  function handleDelete(userId: string, itemId: string) {
+    // Save previous state for rollback
+    const previousActive = activeItem
+    const previousWaiting = waitingItems
+    const previousOffered = offeredItems
+
+    // 1. IMMEDIATE optimistic delete from appropriate queue
+    let newActive = activeItem
+    let newWaiting = waitingItems
+    let newOffered = offeredItems
+
+    if (activeItem?.id === itemId) {
+      // If deleting active item, promote first waiting
+      newActive = waitingItems.length > 0 ? waitingItems[0] : null
+      newWaiting = waitingItems.length > 0 ? waitingItems.slice(1) : []
+    } else {
+      // Otherwise remove from waiting or offered
+      newWaiting = waitingItems.filter((item) => item.id !== itemId)
+      newOffered = offeredItems.filter((item) => item.id !== itemId)
+    }
+
+    // Update state optimistically
+    setActiveItem(newActive)
+    setWaitingItems(newWaiting)
+    setOfferedItems(newOffered)
+    setError(null)
+    setProcessingItemId(itemId)
+
+    // 2. Run server action in parallel
+    startTransition(async () => {
+      try {
+        const formData = new FormData()
+        formData.append("actingUserId", userId)
+        formData.append("itemId", itemId)
+        await deleteItemAction(formData)
+        // 3. SUCCESS: Keep optimistic state, server confirmed it
+      } catch (err) {
+        // 4. FAILURE: Rollback on error
+        setActiveItem(previousActive)
+        setWaitingItems(previousWaiting)
+        setOfferedItems(previousOffered)
+        setError(err instanceof Error ? err.message : "Failed to delete item")
+        console.error("Failed to delete item:", err)
       } finally {
         setProcessingItemId(null)
       }
@@ -391,11 +500,12 @@ export function FocusBoard({ data }: { data: FocusRouteData }) {
                   >
                     Accept
                   </button>
-                  <form action={deleteItemAction}>
-                    <input type="hidden" name="actingUserId" value={data.selectedUserId ?? ""} />
-                    <input type="hidden" name="itemId" value={item.id} />
-                    <button type="submit">Delete</button>
-                  </form>
+                  <button
+                    disabled={!data.selectedUserId || isPending}
+                    onClick={() => handleDelete(data.selectedUserId ?? "", item.id)}
+                  >
+                    Delete
+                  </button>
                 </div>
               ))
             )}
@@ -430,11 +540,12 @@ export function FocusBoard({ data }: { data: FocusRouteData }) {
                     >
                       Down
                     </button>
-                    <form action={deleteItemAction}>
-                      <input type="hidden" name="actingUserId" value={data.selectedUserId ?? ""} />
-                      <input type="hidden" name="itemId" value={item.id} />
-                      <button type="submit">Delete</button>
-                    </form>
+                    <button
+                      disabled={!data.selectedUserId || isPending}
+                      onClick={() => handleDelete(data.selectedUserId ?? "", item.id)}
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))

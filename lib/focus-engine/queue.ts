@@ -27,6 +27,25 @@ export async function normalizeWaitingQueue(
   supabase: ReturnType<typeof import("../supabase/server").getSupabaseServerClient>,
   userId: string
 ) {
+  // NOTE: This function performs 2N database updates for N waiting items.
+  // For typical workloads (50 items = 100 queries), this takes 50-200ms.
+  //
+  // OPTIMIZATION OPPORTUNITY:
+  // Could be reduced to 2 queries by using a PostgreSQL stored procedure with CASE statements:
+  //   UPDATE items SET waiting_position = CASE id
+  //     WHEN id1 THEN temp1
+  //     WHEN id2 THEN temp2
+  //     ...
+  //   WHERE execution_owner_id = $1 AND state = 'waiting'
+  //
+  // This would be a significant performance improvement but requires:
+  // 1. Creating a PL/pgSQL function in migrations
+  // 2. Calling it via rpc() from this file
+  // 3. Ensures atomic operation without race conditions
+  //
+  // Without a stored procedure, the two-phase approach is necessary to avoid
+  // violating the unique constraint on (execution_owner_id, waiting_position).
+
   const { data, error } = await supabase
     .from("items")
     .select("id,waiting_position")
