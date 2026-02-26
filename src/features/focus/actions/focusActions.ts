@@ -29,13 +29,26 @@ function isNextRedirectError(error: unknown) {
   return typeof maybeDigest === "string" && maybeDigest.includes("NEXT_REDIRECT")
 }
 
+/**
+ * Schedule cache invalidation to run after the response is sent.
+ * This prevents blocking the response while still ensuring cache is invalidated.
+ * @param paths - Array of paths to revalidate
+ */
+function revalidateInBackground(paths: string[]) {
+  // Use setTimeout with 0 delay to queue revalidation after response is sent
+  // This is safe because the response has already been serialized by the time this executes
+  setTimeout(() => {
+    paths.forEach(path => revalidatePath(path))
+  }, 0)
+}
+
 export async function acceptItemAction(formData: FormData) {
   try {
     const userId = assertField(formData, "userId")
     const itemId = assertField(formData, "itemId")
     await acceptItem({ itemId, userId })
-    // Invalidate cache so future refetches get fresh data
-    revalidatePath("/focus")
+    // Cache invalidation happens in background - optimistic update already on client
+    revalidateInBackground(["/focus"])
     return { success: true, userId, itemId }
   } catch (error) {
     if (isNextRedirectError(error)) {
@@ -50,8 +63,8 @@ export async function activateItemAction(formData: FormData) {
     const userId = assertField(formData, "userId")
     const itemId = assertField(formData, "itemId")
     await activateItem({ itemId, userId })
-    // Invalidate cache so future refetches get fresh data
-    revalidatePath("/focus")
+    // Cache invalidation happens in background - optimistic update already on client
+    revalidateInBackground(["/focus"])
     return { success: true, userId, itemId }
   } catch (error) {
     if (isNextRedirectError(error)) {
@@ -66,8 +79,8 @@ export async function completeItemAction(formData: FormData) {
     const userId = assertField(formData, "userId")
     const itemId = assertField(formData, "itemId")
     await completeItem({ itemId, userId })
-    // Invalidate cache so future refetches get fresh data
-    revalidatePath("/focus")
+    // Cache invalidation happens in background - optimistic update already on client
+    revalidateInBackground(["/focus"])
     return { success: true, userId, itemId }
   } catch (error) {
     if (isNextRedirectError(error)) {
@@ -83,8 +96,8 @@ export async function reorderWaitingItemAction(formData: FormData) {
     const itemId = assertField(formData, "itemId")
     const direction = assertField(formData, "direction")
     await reorderWaitingItem({ itemId, userId, direction: direction as "up" | "down" })
-    // Invalidate cache so future refetches get fresh data
-    revalidatePath("/focus")
+    // Cache invalidation happens in background - optimistic update already on client
+    revalidateInBackground(["/focus"])
     return { success: true, userId, itemId, direction }
   } catch (error) {
     if (isNextRedirectError(error)) {
@@ -100,8 +113,8 @@ export async function createUserItemAction(formData: FormData) {
     const title = assertField(formData, "title")
     const description = String(formData.get("description") ?? "").trim()
     await createUserItem({ userId, title, description })
-    // Invalidate cache so future refetches get fresh data
-    revalidatePath("/focus")
+    // Cache invalidation happens in background - optimistic update already on client
+    revalidateInBackground(["/focus"])
     return { success: true, userId, title, description }
   } catch (error) {
     if (isNextRedirectError(error)) {

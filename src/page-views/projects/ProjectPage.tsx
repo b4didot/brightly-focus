@@ -2,6 +2,7 @@ import { FilterBar } from "@/components/molecules"
 import { ProjectDetailPanel, ProjectQueuePanel, ProjectWindowPanel } from "@/components/organisms"
 import { AppSidebar, PageContainer, SplitLayout, TopBar } from "@/components/layouts"
 import { getProjectPageView } from "@/features/projects/view"
+import contextStyles from "@/components/organisms/contextPanel.module.css"
 
 export function ProjectPage() {
   const data = getProjectPageView()
@@ -21,11 +22,14 @@ export function ProjectPage() {
           <ProjectQueuePanel key="team" title="Team Project Queue" projects={data.teamProjects} />,
           <ProjectQueuePanel key="personal" title="Personal Project Queue" projects={data.personalProjects} />,
         ]}
-        rightTopColumns={1}
-        rightTopSections={[
-          <ProjectWindowPanel key="head" title="Project Head Info" project={data.selectedProject} />,
-        ]}
+        rightHeader={
+          <div className={contextStyles.tabBar}>
+            <span className={[contextStyles.tabButton, contextStyles.tabButtonActive].join(" ")}>Project</span>
+          </div>
+        }
+        rightContext={<ProjectWindowPanel title="Project Head Info" project={data.selectedProject} />}
         rightBottom={<ProjectDetailPanel project={data.selectedProject} />}
+        isContextOpen={true}
       />
     </PageContainer>
   )

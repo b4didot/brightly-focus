@@ -112,16 +112,28 @@
 .rightColumn {
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(0, 30fr) minmax(0, 70fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 1rem;
   overflow: hidden;
 }
 
-.rightTop {
+.rightColumn[data-context-open="true"] {
+  grid-template-rows: minmax(0, 30fr) minmax(0, 70fr);
+}
+
+.rightHeader {
   min-height: 0;
   display: grid;
   gap: 1rem;
   align-items: stretch;
+}
+
+.rightContext {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 1rem;
+  overflow: hidden;
 }
 
 .rightBottom {
@@ -205,24 +217,11 @@
 
 .activeSection {
   background: var(--panel-surface-alt);
-  border-color: rgba(99, 102, 241, 0.45);
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.65), 0 0 0 1px rgba(99, 102, 241, 0.35);
-}
-
-.activeSection::before,
-.workspaceSection::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  border-top-left-radius: 18px;
-  border-top-right-radius: 18px;
-  background: #6366f1;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.65);
 }
 
 .workspaceSection {
   background: #1f2937;
-  border-color: rgba(99, 102, 241, 0.25);
   box-shadow: 0 18px 44px rgba(2, 6, 23, 0.55);
 }
 
@@ -265,6 +264,10 @@
   }
 
   .rightColumn {
+    grid-template-rows: auto minmax(280px, auto);
+  }
+
+  .rightColumn[data-context-open="true"] {
     grid-template-rows: minmax(120px, auto) minmax(280px, auto);
   }
 }

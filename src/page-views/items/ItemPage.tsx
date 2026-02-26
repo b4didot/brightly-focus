@@ -1,16 +1,13 @@
+"use client"
+
 import { FilterBar } from "@/components/molecules"
-import {
-  CompletedListPanel,
-  ItemQueuePanel,
-  ItemWindowPanel,
-  MilestoneWindowPanel,
-  ProjectWindowPanel,
-} from "@/components/organisms"
+import { CompletedListPanel, ContextTabBar, ContextTabBody, ItemQueuePanel, ItemWindowPanel, useContextPanelState } from "@/components/organisms"
 import { AppSidebar, PageContainer, SplitLayout, TopBar } from "@/components/layouts"
 import { getItemPageView } from "@/features/items/view"
 
 export function ItemPage() {
   const data = getItemPageView()
+  const { isOpen: isContextOpen, activeTabId, handleTabClick } = useContextPanelState(data.selectedItem?.id ?? null)
 
   return (
     <PageContainer
@@ -27,11 +24,14 @@ export function ItemPage() {
           <ItemQueuePanel key="queue" title="Active + waiting queue" items={data.queueItems} />,
           <CompletedListPanel key="completed" items={data.completedItems} />,
         ]}
-        rightTopSections={[
-          <ProjectWindowPanel key="project" project={data.selectedProject} />,
-          <MilestoneWindowPanel key="milestone" milestone={data.selectedMilestone} />,
-        ]}
+        rightHeader={<ContextTabBar activeTabId={activeTabId} isOpen={isContextOpen} onTabClick={handleTabClick} />}
+        rightContext={
+          isContextOpen ? (
+            <ContextTabBody activeTabId={activeTabId} project={data.selectedProject} milestone={data.selectedMilestone} />
+          ) : null
+        }
         rightBottom={<ItemWindowPanel item={data.selectedItem} />}
+        isContextOpen={isContextOpen}
       />
     </PageContainer>
   )

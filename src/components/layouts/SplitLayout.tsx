@@ -3,18 +3,20 @@ import styles from "./layouts.module.css"
 
 interface SplitLayoutProps {
   leftSections: ReactNode[]
-  rightTopSections: ReactNode[]
+  rightHeader: ReactNode
+  rightContext?: ReactNode | null
   rightBottom: ReactNode
   leftRowTemplate: string
-  rightTopColumns?: number
+  isContextOpen: boolean
 }
 
 export function SplitLayout({
   leftSections,
-  rightTopSections,
+  rightHeader,
+  rightContext,
   rightBottom,
   leftRowTemplate,
-  rightTopColumns = 2,
+  isContextOpen,
 }: SplitLayoutProps) {
   return (
     <section className={styles.splitLayout}>
@@ -25,17 +27,19 @@ export function SplitLayout({
           </div>
         ))}
       </div>
-      <div className={styles.rightColumn}>
-        <div
-          className={styles.rightTop}
-          style={{ gridTemplateColumns: `repeat(${rightTopColumns}, minmax(0, 1fr))` }}
-        >
-          {rightTopSections.map((section, index) => (
-            <div key={index} className={styles.splitCell}>
-              {section}
+      <div className={styles.rightColumn} data-context-open={isContextOpen ? "true" : "false"}>
+        {isContextOpen && rightContext ? (
+          <div className={styles.rightContext}>
+            <div className={styles.rightHeader}>
+              <div className={styles.splitCell}>{rightHeader}</div>
             </div>
-          ))}
-        </div>
+            <div className={styles.splitCell}>{rightContext}</div>
+          </div>
+        ) : (
+          <div className={styles.rightHeader}>
+            <div className={styles.splitCell}>{rightHeader}</div>
+          </div>
+        )}
         <div className={styles.rightBottom}>
           <div className={styles.splitCell}>{rightBottom}</div>
         </div>

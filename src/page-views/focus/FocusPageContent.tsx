@@ -1,13 +1,7 @@
 "use client"
 
 import { useState, useCallback, useTransition } from "react"
-import {
-  ActiveItemPanel,
-  ItemWindowPanel,
-  MilestoneWindowPanel,
-  ProjectWindowPanel,
-  WaitingQueuePanel,
-} from "@/components/organisms"
+import { ActiveItemPanel, ContextTabBar, ContextTabBody, ItemWindowPanel, WaitingQueuePanel, useContextPanelState } from "@/components/organisms"
 import { SplitLayout } from "@/components/layouts"
 import type { Item, Project, Milestone } from "@/types"
 import { activateItemAction, reorderWaitingItemAction } from "@/features/focus/actions/focusActions"
@@ -37,6 +31,7 @@ export function FocusPageContent({
   const [error, setError] = useState<string | null>(null)
   const [processingItemId, setProcessingItemId] = useState<string | null>(null)
   const [, startTransition] = useTransition()
+  const { isOpen: isContextOpen, activeTabId, handleTabClick } = useContextPanelState(selectedItemId)
 
   // Sync optimistic state when server data changes (e.g., user switch)
   const handleActivate = useCallback(
@@ -148,11 +143,14 @@ export function FocusPageContent({
           processingItemId={processingItemId}
         />,
       ]}
-      rightTopSections={[
-        <ProjectWindowPanel key="project" project={selectedProject} />,
-        <MilestoneWindowPanel key="milestone" milestone={selectedMilestone} />,
-      ]}
+      rightHeader={<ContextTabBar activeTabId={activeTabId} isOpen={isContextOpen} onTabClick={handleTabClick} />}
+      rightContext={
+        isContextOpen ? (
+          <ContextTabBody activeTabId={activeTabId} project={selectedProject} milestone={selectedMilestone} />
+        ) : null
+      }
       rightBottom={<ItemWindowPanel item={selectedItem} />}
+      isContextOpen={isContextOpen}
     />
   )
 }

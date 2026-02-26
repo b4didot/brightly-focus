@@ -1,7 +1,6 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { redirect } from "next/navigation"
 import { deleteItem } from "../../../../lib/focus-engine/deleteItem"
 import { toFocusEngineError } from "../../../../lib/focus-engine/errors"
 import { mapFocusEngineErrorToUserMessage } from "../../focus/actions/errorMapping"
@@ -24,8 +23,17 @@ function isNextRedirectError(error: unknown) {
   return typeof maybeDigest === "string" && maybeDigest.includes("NEXT_REDIRECT")
 }
 
-function toFocusPath(userId: string) {
-  return `/focus?userId=${encodeURIComponent(userId)}`
+/**
+ * Schedule cache invalidation to run after the response is sent.
+ * This prevents blocking the response while still ensuring cache is invalidated.
+ * @param paths - Array of paths to revalidate
+ */
+function revalidateInBackground(paths: string[]) {
+  // Use setTimeout with 0 delay to queue revalidation after response is sent
+  // This is safe because the response has already been serialized by the time this executes
+  setTimeout(() => {
+    paths.forEach(path => revalidatePath(path))
+  }, 0)
 }
 
 export async function deleteItemAction(formData: FormData) {
@@ -35,9 +43,8 @@ export async function deleteItemAction(formData: FormData) {
 
     await deleteItem({ itemId, actingUserId })
 
-    revalidatePath("/focus")
-    revalidatePath("/projects")
-    revalidatePath("/milestones")
+    // Cache invalidation happens in background - optimistic update already on client
+    revalidateInBackground(["/focus", "/projects", "/milestones"])
     // Return success without redirecting - optimistic client update already removed the item
     return { success: true, actingUserId, itemId }
   } catch (error) {
