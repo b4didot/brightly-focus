@@ -1,4 +1,4 @@
-"use server"
+﻿"use server"
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
@@ -19,8 +19,8 @@ function optionalField(formData: FormData, fieldName: string) {
 }
 
 function parseVisibilityScope(value: string) {
-  if (value !== "team" && value !== "personal") {
-    throw new Error('visibilityScope must be either "team" or "personal".')
+  if (value !== "team" && value !== "private") {
+    throw new Error('visibilityScope must be either "team" or "private".')
   }
 
   return value
@@ -103,7 +103,8 @@ export async function createProjectStructureAction(formData: FormData) {
       throw new Error("Acting user does not belong to the selected team.")
     }
 
-    const resolvedDefaultUserId = explicitDefaultUserId ?? actingUserId
+    const resolvedDefaultUserId =
+      visibilityScope === "private" ? actingUserId : (explicitDefaultUserId ?? actingUserId)
 
     const { data: defaultUser, error: defaultUserError } = await supabase
       .from("users")
@@ -126,10 +127,15 @@ export async function createProjectStructureAction(formData: FormData) {
       throw new Error("Default user must belong to the same organization/team as the project.")
     }
 
+    if (visibilityScope === "private" && defaultUser.id !== actingUser.id) {
+      throw new Error("Private projects must use the creator as the default user.")
+    }
+
     const basePayload = {
       organization_id: actingUser.organization_id,
       team_id: actingUser.team_id,
       default_user_id: defaultUser.id,
+      created_by_user_id: actingUser.id,
       name,
     }
     const contextualPayload = {
@@ -148,7 +154,7 @@ export async function createProjectStructureAction(formData: FormData) {
     if (createResult.error && isMissingColumnError(createResult.error.message)) {
       if (requiresProjectContextColumns({ description, dueAt, visibilityScope })) {
         throw new Error(
-          "Project context fields are not available in the current database schema. Apply the latest migration to use description, due date, or personal scope."
+          "Project context fields are not available in the current database schema. Apply the latest migration to use description, due date, or private scope."
         )
       }
       createResult = await supabase.from("projects").insert(basePayload).select("id").maybeSingle()
@@ -223,7 +229,7 @@ export async function updateProjectStructureAction(formData: FormData) {
 
     const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id,organization_id,team_id,default_user_id")
+      .select("id,organization_id,team_id,default_user_id,created_by_user_id")
       .eq("id", projectId)
       .maybeSingle()
 
@@ -239,7 +245,8 @@ export async function updateProjectStructureAction(formData: FormData) {
       throw new Error("Only same-team members can edit this project.")
     }
 
-    const resolvedDefaultUserId = defaultUserId ?? project.default_user_id
+    const resolvedDefaultUserId =
+      visibilityScope === "private" ? project.created_by_user_id : (defaultUserId ?? project.default_user_id)
 
     const { data: defaultUser, error: defaultUserError } = await supabase
       .from("users")
@@ -257,6 +264,10 @@ export async function updateProjectStructureAction(formData: FormData) {
 
     if (defaultUser.organization_id !== project.organization_id || defaultUser.team_id !== project.team_id) {
       throw new Error("Default user must belong to the same organization/team as the project.")
+    }
+
+    if (visibilityScope === "private" && defaultUser.id !== project.created_by_user_id) {
+      throw new Error("Private projects must use the creator as the default user.")
     }
 
     const baseUpdatePayload = {
@@ -278,7 +289,7 @@ export async function updateProjectStructureAction(formData: FormData) {
     if (updateResult.error && isMissingColumnError(updateResult.error.message)) {
       if (requiresProjectContextColumns({ description, dueAt, visibilityScope })) {
         throw new Error(
-          "Project context fields are not available in the current database schema. Apply the latest migration to update description, due date, or personal scope."
+          "Project context fields are not available in the current database schema. Apply the latest migration to update description, due date, or private scope."
         )
       }
       updateResult = await supabase.from("projects").update(baseUpdatePayload).eq("id", projectId)
@@ -292,6 +303,66 @@ export async function updateProjectStructureAction(formData: FormData) {
     revalidatePath("/milestones")
     revalidatePath("/focus")
     redirect(toProjectsPath(actingUserId))
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error
+    }
+
+    throw error
+  }
+}
+
+export async function updateProjectDescriptionAction(formData: FormData) {
+  try {
+    const actingUserId = assertField(formData, "actingUserId")
+    const projectId = assertField(formData, "projectId")
+    const description = optionalField(formData, "description")
+
+    const supabase = getSupabaseServerClient()
+
+    const { data: actingUser, error: actingUserError } = await supabase
+      .from("users")
+      .select("id,organization_id,team_id")
+      .eq("id", actingUserId)
+      .maybeSingle()
+
+    if (actingUserError) {
+      throw new Error(`Failed to validate acting user: ${actingUserError.message}`)
+    }
+
+    if (!actingUser) {
+      throw new Error(`Acting user "${actingUserId}" does not exist.`)
+    }
+
+    const { data: project, error: projectError } = await supabase
+      .from("projects")
+      .select("id,organization_id,team_id")
+      .eq("id", projectId)
+      .maybeSingle()
+
+    if (projectError) {
+      throw new Error(`Failed to load project: ${projectError.message}`)
+    }
+
+    if (!project) {
+      throw new Error(`Project "${projectId}" does not exist.`)
+    }
+
+    if (project.organization_id !== actingUser.organization_id || project.team_id !== actingUser.team_id) {
+      throw new Error("Only same-team members can edit this project.")
+    }
+
+    const { error: updateError } = await supabase
+      .from("projects")
+      .update({ description })
+      .eq("id", projectId)
+
+    if (updateError) {
+      throw new Error(`Failed to update project description: ${updateError.message}`)
+    }
+
+    revalidatePath("/projects")
+    redirect(`${toProjectsPath(actingUserId)}&projectId=${encodeURIComponent(projectId)}`)
   } catch (error) {
     if (isNextRedirectError(error)) {
       throw error

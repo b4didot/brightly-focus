@@ -1,10 +1,27 @@
+"use client"
+
 import Image from "next/image"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { CircleDot, List, FolderOpen } from "lucide-react"
 import { Icon } from "@/components/atoms"
 import styles from "./layouts.module.css"
 
 interface AppSidebarProps {
   navLabels: string[]
+}
+
+function getHrefForLabel(label: string) {
+  switch (label) {
+    case "Nav 1":
+      return "/focus"
+    case "Nav 2":
+      return "/items"
+    case "Nav 3":
+      return "/projects"
+    default:
+      return "/"
+  }
 }
 
 function getIconForLabel(label: string) {
@@ -21,6 +38,8 @@ function getIconForLabel(label: string) {
 }
 
 export function AppSidebar({ navLabels }: AppSidebarProps) {
+  const pathname = usePathname()
+
   return (
     <aside className={styles.sidebar}>
       <Image
@@ -33,9 +52,14 @@ export function AppSidebar({ navLabels }: AppSidebarProps) {
       />
       <nav className={styles.sidebarNav} aria-label="Nav Bar">
         {navLabels.map((label) => (
-          <button key={label} className={styles.navButton} type="button" aria-label={label}>
+          <Link
+            key={label}
+            className={[styles.navButton, pathname === getHrefForLabel(label) ? styles.navButtonActive : ""].filter(Boolean).join(" ")}
+            href={getHrefForLabel(label)}
+            aria-label={label}
+          >
             {getIconForLabel(label)}
-          </button>
+          </Link>
         ))}
       </nav>
       <Icon label="User Pic" size={56} rounded />

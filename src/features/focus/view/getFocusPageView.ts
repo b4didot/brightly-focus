@@ -94,7 +94,7 @@ export async function getFocusPageView(
       id: project.id,
       name: project.name,
       summary: project.description ?? "No project description.",
-      scope: project.visibilityScope === "personal" ? "personal" : "team",
+      scope: project.visibilityScope === "private" ? "private" : "team",
       headInfo: `Due: ${project.dueAt ?? "n/a"} | Items: ${project.itemCount}`,
       milestones: projectMilestones.map((milestone) => ({
         id: milestone.id,

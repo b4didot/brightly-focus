@@ -83,7 +83,7 @@ export function ProjectCatalogPanel({ data }: { data: ProjectCatalogRouteData })
                 Visibility Scope
                 <select name="visibilityScope" defaultValue="team">
                   <option value="team">Team</option>
-                  <option value="personal">Personal</option>
+                  <option value="private">Private</option>
                 </select>
               </label>
               <label>
@@ -158,7 +158,7 @@ export function ProjectCatalogPanel({ data }: { data: ProjectCatalogRouteData })
                       Visibility Scope
                       <select name="visibilityScope" defaultValue={project.visibilityScope}>
                         <option value="team">Team</option>
-                        <option value="personal">Personal</option>
+                        <option value="private">Private</option>
                       </select>
                     </label>
                     <label>

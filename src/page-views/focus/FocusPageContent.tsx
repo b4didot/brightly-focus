@@ -31,7 +31,7 @@ export function FocusPageContent({
   const [error, setError] = useState<string | null>(null)
   const [processingItemId, setProcessingItemId] = useState<string | null>(null)
   const [, startTransition] = useTransition()
-  const { isOpen: isContextOpen, activeTabId, handleTabClick } = useContextPanelState(selectedItemId)
+  const { isOpen: isContextOpen, activeTabId, handleTabClick } = useContextPanelState()
 
   // Sync optimistic state when server data changes (e.g., user switch)
   const handleActivate = useCallback(
@@ -143,7 +143,7 @@ export function FocusPageContent({
           processingItemId={processingItemId}
         />,
       ]}
-      rightHeader={<ContextTabBar activeTabId={activeTabId} isOpen={isContextOpen} onTabClick={handleTabClick} />}
+      rightHeader={<ContextTabBar activeTabId={activeTabId} onTabClick={handleTabClick} />}
       rightContext={
         isContextOpen ? (
           <ContextTabBody activeTabId={activeTabId} project={selectedProject} milestone={selectedMilestone} />

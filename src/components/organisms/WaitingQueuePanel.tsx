@@ -43,7 +43,7 @@ export function WaitingQueuePanel({
   }
 
   return (
-    <SectionContainer title="Item Queue" tone="secondary">
+    <SectionContainer title="Waiting Item" tone="secondary">
       {error && (
         <div style={{ color: "var(--error)", marginBottom: "1rem", padding: "0.5rem", backgroundColor: "rgba(255, 0, 0, 0.1)", borderRadius: "0.6rem" }}>
           {error}

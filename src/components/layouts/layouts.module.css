@@ -80,7 +80,7 @@
   color: var(--text-primary);
 }
 
-.sidebarNav .navButton:first-child {
+.navButtonActive {
   background: rgba(99, 102, 241, 0.22);
   color: var(--text-primary);
 }

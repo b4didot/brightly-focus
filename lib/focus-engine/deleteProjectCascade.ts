@@ -19,6 +19,7 @@ type DbProject = {
   organization_id: string
   team_id: string
   default_user_id: string
+  created_by_user_id: string
   visibility_scope: string | null
 }
 
@@ -65,7 +66,7 @@ export async function deleteProjectCascade({
 
     const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id,organization_id,team_id,default_user_id,visibility_scope")
+      .select("id,organization_id,team_id,default_user_id,created_by_user_id,visibility_scope")
       .eq("id", normalizedProjectId)
       .maybeSingle()
 
@@ -79,7 +80,14 @@ export async function deleteProjectCascade({
 
     const projectRow = project as DbProject
 
-    if (projectRow.default_user_id !== normalizedActingUserId) {
+    if (projectRow.visibility_scope !== "private") {
+      throw new FocusEngineError(
+        "DELETE_NOT_ALLOWED_SCOPE",
+        "Only private-scope projects can be deleted."
+      )
+    }
+
+    if (projectRow.created_by_user_id !== normalizedActingUserId) {
       throw new FocusEngineError(
         "DELETE_NOT_ALLOWED_PERMISSION",
         "Only the project owner can delete this project."

@@ -6,6 +6,7 @@ type DbProject = {
   organization_id: string
   team_id: string
   default_user_id: string
+  created_by_user_id: string
   name?: string | null
   description?: string | null
   visibility_scope?: string | null
@@ -28,9 +29,10 @@ export type ProjectCatalogItem = {
   id: string
   name: string
   description: string | null
-  visibilityScope: "team" | "personal"
+  visibilityScope: "team" | "private"
   dueAt: string | null
   defaultUserId: string
+  createdByUserId: string
   milestoneCount: number
   itemCount: number
 }
@@ -49,8 +51,8 @@ function asProjectName(value: string | null | undefined, id: string) {
   return normalized && normalized.length > 0 ? normalized : `Project ${id}`
 }
 
-function asScope(value: string | null | undefined): "team" | "personal" {
-  return value === "personal" ? "personal" : "team"
+function asScope(value: string | null | undefined): "team" | "private" {
+  return value === "private" ? "private" : "team"
 }
 
 export async function getProjectCatalogRouteData(userId?: string): Promise<ProjectCatalogRouteData> {
@@ -128,7 +130,7 @@ export async function getProjectCatalogRouteData(userId?: string): Promise<Proje
   const projects = projectRows
     .filter((project) => {
       const scope = asScope(project.visibility_scope)
-      return scope === "team" || project.default_user_id === selectedUserScope.id
+      return scope === "team" || project.created_by_user_id === selectedUserScope.id
     })
     .map((project) => {
       const milestoneIds = milestoneByProject.get(project.id) ?? []
@@ -140,6 +142,7 @@ export async function getProjectCatalogRouteData(userId?: string): Promise<Proje
         visibilityScope: asScope(project.visibility_scope),
         dueAt: project.due_at ?? null,
         defaultUserId: project.default_user_id,
+        createdByUserId: project.created_by_user_id,
         milestoneCount: milestoneIds.length,
         itemCount,
       } satisfies ProjectCatalogItem

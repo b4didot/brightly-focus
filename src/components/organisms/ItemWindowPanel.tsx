@@ -27,7 +27,7 @@ export function ItemWindowPanel({ item }: ItemWindowPanelProps) {
   }
 
   return (
-    <SectionContainer title="Item Window" tone="workspace">
+    <SectionContainer title="Description" tone="workspace">
       {item ? (
         <div style={{ display: "grid", gap: "0.8rem", height: "100%", minHeight: 0 }}>
           <ItemCard
@@ -48,4 +48,3 @@ export function ItemWindowPanel({ item }: ItemWindowPanelProps) {
     </SectionContainer>
   )
 }
-

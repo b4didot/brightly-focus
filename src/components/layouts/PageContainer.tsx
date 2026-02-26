@@ -3,7 +3,7 @@ import styles from "./layouts.module.css"
 
 interface PageContainerProps {
   sidebar: ReactNode
-  topBar: ReactNode
+  topBar?: ReactNode
   children: ReactNode
 }
 
@@ -12,7 +12,7 @@ export function PageContainer({ sidebar, topBar, children }: PageContainerProps)
     <div className={styles.pageContainer}>
       {sidebar}
       <div className={styles.mainArea}>
-        {topBar}
+        {topBar ? topBar : null}
         {children}
       </div>
     </div>

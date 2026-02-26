@@ -16,7 +16,7 @@ export function ProjectWindowPanel({
   children,
 }: ProjectWindowPanelProps) {
   return (
-    <SectionContainer title={title} tone="context">
+    <SectionContainer title={title} tone="context" hideTitle>
       {project ? (
         <>
           <ProjectCard project={project} />

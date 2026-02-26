@@ -1,6 +1,6 @@
 import type { Milestone } from "./milestone"
 
-export type ProjectScope = "team" | "personal"
+export type ProjectScope = "team" | "private"
 
 export interface Project {
   id: string

@@ -14,7 +14,7 @@ export function mapFocusEngineErrorToUserMessage(error: FocusEngineError) {
   }
 
   if (error.code === "DELETE_NOT_ALLOWED_SCOPE") {
-    return "Only personal-scope structures can be deleted."
+    return "Only private-scope structures can be deleted."
   }
 
   if (error.code === "DELETE_NOT_ALLOWED_PERMISSION") {

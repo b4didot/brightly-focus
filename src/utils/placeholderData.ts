@@ -35,7 +35,7 @@ const projects: Project[] = [
     id: "p2",
     name: "Personal UX Notes",
     summary: "Private backlog of refinements.",
-    scope: "personal",
+    scope: "private",
     headInfo: "Owner: You | Cycle: Rolling",
     milestones: [milestones[1]],
   },

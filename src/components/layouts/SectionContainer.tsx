@@ -7,6 +7,7 @@ interface SectionContainerProps {
   emphasize?: boolean
   tone?: "default" | "secondary" | "context" | "workspace"
   scrollable?: boolean
+  hideTitle?: boolean
 }
 
 export function SectionContainer({
@@ -15,6 +16,7 @@ export function SectionContainer({
   emphasize = false,
   tone = "default",
   scrollable = true,
+  hideTitle = false,
 }: SectionContainerProps) {
   const toneClassMap = {
     default: "",
@@ -32,7 +34,7 @@ export function SectionContainer({
 
   return (
     <section className={className}>
-      <h2 className={styles.sectionTitle}>{title}</h2>
+      {!hideTitle ? <h2 className={styles.sectionTitle}>{title}</h2> : null}
       <div className={contentClassName}>{children}</div>
     </section>
   )

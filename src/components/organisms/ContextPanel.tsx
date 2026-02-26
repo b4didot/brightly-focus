@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react"
 import type { Project, Milestone } from "@/types"
 import { CommentsWindowPanel } from "./CommentsWindowPanel"
 import { DetailsWindowPanel } from "./DetailsWindowPanel"
@@ -51,11 +51,13 @@ interface ContextPanelState {
 
 const STORAGE_KEY = "brightly.contextPanel"
 const DEFAULT_STATE: ContextPanelState = { isOpen: true, activeTabId: "details" }
+const subscribeHydration = () => () => {}
 
 function normalizeState(state: Partial<ContextPanelState> | null): ContextPanelState {
   if (!state) return DEFAULT_STATE
-  const validIds = new Set(TABS.map((tab) => tab.id))
-  const activeTabId = validIds.has(state.activeTabId ?? "") ? state.activeTabId : "details"
+  const validIds: ContextTabId[] = TABS.map((tab) => tab.id)
+  const activeTabId: ContextTabId =
+    state.activeTabId && validIds.includes(state.activeTabId) ? state.activeTabId : "details"
   return {
     isOpen: typeof state.isOpen === "boolean" ? state.isOpen : DEFAULT_STATE.isOpen,
     activeTabId,
@@ -74,9 +76,10 @@ function loadStoredState(): ContextPanelState {
   }
 }
 
-export function useContextPanelState(selectedItemId: string | null) {
-  const [state, setState] = useState<ContextPanelState>(DEFAULT_STATE)
-  const previousSelectedId = useRef<string | null>(selectedItemId ?? null)
+export function useContextPanelState() {
+  const [state, setState] = useState<ContextPanelState>(() => loadStoredState())
+  const hasHydrated = useSyncExternalStore(subscribeHydration, () => true, () => false)
+  const renderState = hasHydrated ? state : DEFAULT_STATE
 
   const handleTabClick = useCallback((tabId: ContextTabId) => {
     setState((prev) => {
@@ -91,37 +94,23 @@ export function useContextPanelState(selectedItemId: string | null) {
   }, [])
 
   useEffect(() => {
-    setState(loadStoredState())
-  }, [])
-
-  useEffect(() => {
     if (typeof window === "undefined") return
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   }, [state])
 
-  useEffect(() => {
-    if (selectedItemId === previousSelectedId.current) return
-    previousSelectedId.current = selectedItemId ?? null
-    setState((prev) => {
-      if (!prev.isOpen || prev.activeTabId === "details") return prev
-      return { ...prev, activeTabId: "details" }
-    })
-  }, [selectedItemId])
-
   return {
-    isOpen: state.isOpen,
-    activeTabId: state.activeTabId,
+    isOpen: renderState.isOpen,
+    activeTabId: renderState.activeTabId,
     handleTabClick,
   }
 }
 
 interface ContextTabBarProps {
   activeTabId: ContextTabId
-  isOpen: boolean
   onTabClick: (tabId: ContextTabId) => void
 }
 
-export function ContextTabBar({ activeTabId, isOpen, onTabClick }: ContextTabBarProps) {
+export function ContextTabBar({ activeTabId, onTabClick }: ContextTabBarProps) {
   return (
     <div className={styles.tabBar} role="tablist" aria-label="Context tabs">
       {TABS.map((tab) => {
@@ -132,7 +121,6 @@ export function ContextTabBar({ activeTabId, isOpen, onTabClick }: ContextTabBar
             type="button"
             role="tab"
             aria-selected={isActive}
-            aria-pressed={isActive && isOpen}
             className={[styles.tabButton, isActive ? styles.tabButtonActive : ""].filter(Boolean).join(" ")}
             onClick={() => onTabClick(tab.id)}
           >

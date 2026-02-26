@@ -1,0 +1,461 @@
+.shell {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(250px, 30%) 1fr;
+  gap: 1rem;
+  overflow: hidden;
+}
+
+.topBarControls {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.topBarFilters {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.topBarFilterLabel {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.topBarSelect {
+  min-width: 200px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.86rem;
+}
+
+.listPanel {
+  min-height: 0;
+}
+
+.listPanelBody {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.listHeader {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.scopeSelect {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.38rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.rowList {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+}
+
+.projectRow {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  padding: 0.55rem;
+  background: #111827;
+  display: grid;
+  gap: 0.35rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.projectRowActive {
+  border-color: rgba(99, 102, 241, 0.55);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.25);
+}
+
+.rowTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.rowName {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #cbd5e1;
+}
+
+.teamName {
+  margin: 0;
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
+.progressTrack {
+  width: 100%;
+  height: 5px;
+  background: #0b1220;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4f46e5, #6366f1);
+}
+
+.progressText {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.rightColumn {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.tabBody {
+  min-height: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.metaCard {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  background: #0f172a;
+  padding: 0.55rem;
+}
+
+.metaLabel {
+  margin: 0;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.metaValue {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: #e2e8f0;
+}
+
+.milestoneCard {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  background: #0f172a;
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.milestoneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.milestoneTitle {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.itemList {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.itemRow {
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 10px;
+  padding: 0.45rem;
+  display: grid;
+  gap: 0.2rem;
+  background: #111827;
+}
+
+.itemTitle {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.itemMeta {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.stateBadge {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.itemRowButton {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.contextCard {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  background: #0f172a;
+  padding: 0.6rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.accordionButton {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  background: #111827;
+  color: #e2e8f0;
+  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+}
+
+.commentForm {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.commentInput {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  background: #111827;
+  color: #e2e8f0;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.8rem;
+}
+
+.commentRow {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  background: #111827;
+  padding: 0.5rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.commentMeta {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.commentBody {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+}
+
+.replyList {
+  display: grid;
+  gap: 0.4rem;
+  margin-left: 0.9rem;
+}
+
+.descriptionArea {
+  min-height: 120px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.6rem;
+  font-size: 0.82rem;
+  resize: vertical;
+}
+
+.descriptionActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.emptyText {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.modalLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modalBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.72);
+}
+
+.modalCard {
+  position: relative;
+  z-index: 1;
+  width: min(760px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  background: #0f172a;
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.closeButton {
+  justify-self: end;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  background: #111827;
+  color: #e2e8f0;
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+}
+
+.popTitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.popForm {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.fieldLabel {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.popInput {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  background: #111827;
+  color: #e2e8f0;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.82rem;
+}
+
+.stepEditorHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stepRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.stepActions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.popActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.modalActionButton {
+  min-width: 104px;
+}
+
+.errorText {
+  margin: 0;
+  color: #fca5a5;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 960px) {
+  .topBarControls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topBarFilters {
+    width: 100%;
+  }
+
+  .topBarSelect {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+}

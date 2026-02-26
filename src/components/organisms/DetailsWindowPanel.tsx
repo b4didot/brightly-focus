@@ -3,7 +3,7 @@ import styles from "./organisms.module.css"
 
 export function DetailsWindowPanel() {
   return (
-    <SectionContainer title="Details" tone="context">
+    <SectionContainer title="Details" tone="context" hideTitle>
       <p className={styles.placeholderText}>No details available.</p>
     </SectionContainer>
   )
