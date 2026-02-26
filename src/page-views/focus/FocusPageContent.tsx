@@ -35,7 +35,8 @@ export function FocusPageContent({
   const [optimisticActiveItem, setOptimisticActiveItem] = useState<Item | null>(serverActiveItem)
   const [optimisticWaitingItems, setOptimisticWaitingItems] = useState<Item[]>(serverWaitingItems)
   const [error, setError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+  const [processingItemId, setProcessingItemId] = useState<string | null>(null)
+  const [, startTransition] = useTransition()
 
   // Sync optimistic state when server data changes (e.g., user switch)
   const handleActivate = useCallback(
@@ -60,6 +61,7 @@ export function FocusPageContent({
       setOptimisticActiveItem(newActiveItem)
       setOptimisticWaitingItems(newWaitingItems)
       setError(null)
+      setProcessingItemId(itemId)
 
       // Call server action in background
       startTransition(async () => {
@@ -76,6 +78,8 @@ export function FocusPageContent({
           setOptimisticWaitingItems(serverWaitingItems)
           setError(err instanceof Error ? err.message : "Failed to activate item")
           console.error("Failed to activate item:", err)
+        } finally {
+          setProcessingItemId(null)
         }
       })
     },
@@ -100,6 +104,7 @@ export function FocusPageContent({
       ]
       setOptimisticWaitingItems(newWaitingItems)
       setError(null)
+      setProcessingItemId(itemId)
 
       // Call server action in background
       startTransition(async () => {
@@ -114,6 +119,8 @@ export function FocusPageContent({
           setOptimisticWaitingItems(serverWaitingItems)
           setError(err instanceof Error ? err.message : "Failed to reorder item")
           console.error("Failed to reorder item:", err)
+        } finally {
+          setProcessingItemId(null)
         }
       })
     },
@@ -138,7 +145,7 @@ export function FocusPageContent({
           onActivate={handleActivate}
           onReorder={handleReorder}
           error={error}
-          isPending={isPending}
+          processingItemId={processingItemId}
         />,
       ]}
       rightTopSections={[

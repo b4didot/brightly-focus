@@ -13,7 +13,7 @@ interface WaitingQueuePanelProps {
   onActivate: (itemId: string) => void
   onReorder: (itemId: string, direction: "up" | "down") => void
   error?: string | null
-  isPending?: boolean
+  processingItemId?: string | null
 }
 
 export function WaitingQueuePanel({
@@ -23,7 +23,7 @@ export function WaitingQueuePanel({
   onActivate,
   onReorder,
   error = null,
-  isPending = false,
+  processingItemId = null,
 }: WaitingQueuePanelProps) {
 
   function truncate(value: string | undefined, max: number) {
@@ -66,7 +66,7 @@ export function WaitingQueuePanel({
                 <button
                   className={`${styles.actionButton} ${styles.iconButton}`}
                   type="button"
-                  disabled={!selectedUserId || isPending}
+                  disabled={!selectedUserId || processingItemId === item.id}
                   aria-label="Start Focus"
                   title="Start Focus"
                   onClick={() => onActivate(item.id)}
@@ -76,7 +76,7 @@ export function WaitingQueuePanel({
                 <button
                   className={`${styles.actionButton} ${styles.iconButton}`}
                   type="button"
-                  disabled={!selectedUserId || index === 0 || isPending}
+                  disabled={!selectedUserId || index === 0 || processingItemId === item.id}
                   aria-label="Move Up"
                   title="Move Up"
                   onClick={() => onReorder(item.id, "up")}
@@ -86,7 +86,7 @@ export function WaitingQueuePanel({
                 <button
                   className={`${styles.actionButton} ${styles.iconButton}`}
                   type="button"
-                  disabled={!selectedUserId || index === items.length - 1 || isPending}
+                  disabled={!selectedUserId || index === items.length - 1 || processingItemId === item.id}
                   aria-label="Move Down"
                   title="Move Down"
                   onClick={() => onReorder(item.id, "down")}

@@ -109,7 +109,7 @@ export function OfferedQueuePanel({ items, selectedUserId }: OfferedQueuePanelPr
                 <button
                   className={styles.actionButton}
                   type="button"
-                  disabled={!selectedUserId || isPending}
+                  disabled={!selectedUserId || processingItemId === item.id}
                   aria-label="Accept"
                   title="Accept"
                   onClick={() => handleAccept(item.id)}
@@ -119,7 +119,7 @@ export function OfferedQueuePanel({ items, selectedUserId }: OfferedQueuePanelPr
                 <button
                   className={styles.actionButton}
                   type="button"
-                  disabled={!selectedUserId || isPending}
+                  disabled={!selectedUserId || processingItemId === item.id}
                   aria-label="Delete"
                   title="Delete"
                   onClick={() => handleDelete(item.id)}

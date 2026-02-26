@@ -462,10 +462,10 @@ export function FocusBoard({ data }: { data: FocusRouteData }) {
                     {enrichedItems.get(activeItem.id)?.milestoneName && (
                       <div>🎯 {enrichedItems.get(activeItem.id)?.milestoneName}</div>
                     )}
-                    {enrichedItems.get(activeItem.id)?.tags.length ?? 0 > 0 && (
+                    {(enrichedItems.get(activeItem.id)?.tags.length ?? 0) > 0 && (
                       <div>🏷️ {enrichedItems.get(activeItem.id)?.tags.join(", ")}</div>
                     )}
-                    {enrichedItems.get(activeItem.id)?.stepsCount ?? 0 > 0 && (
+                    {(enrichedItems.get(activeItem.id)?.stepsCount ?? 0) > 0 && (
                       <div>✓ {enrichedItems.get(activeItem.id)?.stepsCount} steps</div>
                     )}
                     {enrichedItems.get(activeItem.id)?.alarmLabel && (
@@ -475,7 +475,7 @@ export function FocusBoard({ data }: { data: FocusRouteData }) {
                 )}
                 <button
                   className="solid"
-                  disabled={!data.selectedUserId || isPending}
+                  disabled={!data.selectedUserId || processingItemId === activeItem!.id}
                   onClick={() => handleComplete(data.selectedUserId ?? "", activeItem!.id)}
                 >
                   Complete
@@ -495,13 +495,13 @@ export function FocusBoard({ data }: { data: FocusRouteData }) {
                 <div key={item.id} className="item-card">
                   <p>{item.title}</p>
                   <button
-                    disabled={!data.selectedUserId || isPending}
+                    disabled={!data.selectedUserId || processingItemId === item.id}
                     onClick={() => handleAccept(data.selectedUserId ?? "", item.id)}
                   >
                     Accept
                   </button>
                   <button
-                    disabled={!data.selectedUserId || isPending}
+                    disabled={!data.selectedUserId || processingItemId === item.id}
                     onClick={() => handleDelete(data.selectedUserId ?? "", item.id)}
                   >
                     Delete
@@ -523,25 +523,25 @@ export function FocusBoard({ data }: { data: FocusRouteData }) {
                   </p>
                   <div className="actions">
                     <button
-                      disabled={!data.selectedUserId}
+                      disabled={!data.selectedUserId || processingItemId === item.id}
                       onClick={() => handleActivate(data.selectedUserId ?? "", item.id)}
                     >
                       Start Focus
                     </button>
                     <button
-                      disabled={!data.selectedUserId || index === 0}
+                      disabled={!data.selectedUserId || index === 0 || processingItemId === item.id}
                       onClick={() => handleReorder(data.selectedUserId ?? "", item.id, "up")}
                     >
                       Up
                     </button>
                     <button
-                      disabled={!data.selectedUserId || index === waitingItems.length - 1}
+                      disabled={!data.selectedUserId || index === waitingItems.length - 1 || processingItemId === item.id}
                       onClick={() => handleReorder(data.selectedUserId ?? "", item.id, "down")}
                     >
                       Down
                     </button>
                     <button
-                      disabled={!data.selectedUserId || isPending}
+                      disabled={!data.selectedUserId || processingItemId === item.id}
                       onClick={() => handleDelete(data.selectedUserId ?? "", item.id)}
                     >
                       Delete
