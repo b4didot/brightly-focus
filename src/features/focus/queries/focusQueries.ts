@@ -1,4 +1,3 @@
-import { unstable_cache } from "next/cache"
 import { getSupabaseServerClient } from "../../../../lib/supabase/server"
 import { toItemView, type DbItem } from "../../items/adapters/itemAdapter"
 import { toUserView, type DbUser } from "../../users/adapters/userAdapter"
@@ -66,8 +65,4 @@ async function _getFocusRouteDataImpl(userId?: string): Promise<FocusRouteData> 
   }
 }
 
-// Cached version with revalidation tag for server actions
-export const getFocusRouteData = unstable_cache(_getFocusRouteDataImpl, ["focus-route-data"], {
-  revalidate: 3600, // Fallback cache time: 1 hour
-  tags: ["focus-route-data"],
-})
+export const getFocusRouteData = _getFocusRouteDataImpl

@@ -33,7 +33,6 @@ export async function FocusPage({
         waitingItems={data.waitingItems}
         selectedProject={data.selectedProject}
         selectedMilestone={data.selectedMilestone}
-        selectedItem={data.selectedItem}
         selectedUserId={data.selectedUserId}
         selectedItemId={data.selectedItem?.id ?? null}
       />

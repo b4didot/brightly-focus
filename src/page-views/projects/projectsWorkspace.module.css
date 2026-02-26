@@ -386,6 +386,79 @@
   gap: 0.65rem;
 }
 
+.modalFieldRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.modalSeparator {
+  width: 100%;
+  height: 1px;
+  background: rgba(148, 163, 184, 0.24);
+}
+
+.milestoneDraftCard {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.milestoneDraftHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.milestoneIconActions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.milestoneIconButton {
+  width: 32px;
+  height: 28px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: #0f172a;
+  color: #cbd5e1;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.milestoneIconButton:hover {
+  border-color: rgba(99, 102, 241, 0.45);
+  background: #1f2937;
+}
+
+.milestoneIconButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.milestoneIconButton svg {
+  width: 15px;
+  height: 15px;
+}
+
+.milestoneDeleteButton {
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fda4af;
+}
+
+.milestoneDeleteButton:hover {
+  border-color: rgba(239, 68, 68, 0.62);
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.fullWidthButton {
+  width: 100%;
+}
+
 .fieldLabel {
   display: grid;
   gap: 0.35rem;
@@ -456,6 +529,10 @@
   }
 
   .detailGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .modalFieldRow {
     grid-template-columns: 1fr;
   }
 }

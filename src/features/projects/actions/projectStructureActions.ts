@@ -76,7 +76,20 @@ export async function createProjectStructureAction(formData: FormData) {
     const actingUserId = assertField(formData, "actingUserId")
     const teamId = assertField(formData, "teamId")
     const name = assertField(formData, "name")
-    const firstMilestoneName = assertField(formData, "firstMilestoneName")
+    const milestoneNames = formData
+      .getAll("milestoneName")
+      .map((value) => String(value ?? "").trim())
+      .filter((value) => value.length > 0)
+    const milestoneDescriptions = formData
+      .getAll("milestoneDescription")
+      .map((value) => String(value ?? "").trim())
+    const legacyFirstMilestoneName = optionalField(formData, "firstMilestoneName")
+    const resolvedMilestoneNames = milestoneNames.length > 0
+      ? milestoneNames
+      : (legacyFirstMilestoneName ? [legacyFirstMilestoneName] : [])
+    if (resolvedMilestoneNames.length === 0) {
+      throw new Error('Missing required field "milestoneName".')
+    }
     const visibilityScope = parseVisibilityScope(assertField(formData, "visibilityScope"))
     const description = optionalField(formData, "description")
     const dueAt = normalizeDueAt(optionalField(formData, "dueAt"))
@@ -169,23 +182,26 @@ export async function createProjectStructureAction(formData: FormData) {
       throw new Error("Project creation returned no row.")
     }
 
-    let firstMilestoneResult = await supabase.from("milestones").insert({
+    const milestonePayload = resolvedMilestoneNames.map((milestoneName, index) => ({
       project_id: createdProject.id,
-      name: firstMilestoneName,
-      description: null,
-    })
+      name: milestoneName,
+      description: milestoneDescriptions[index] ? milestoneDescriptions[index] : null,
+    }))
+    const legacyMilestonePayload = resolvedMilestoneNames.map((milestoneName) => ({
+      project_id: createdProject.id,
+      name: milestoneName,
+    }))
+
+    let firstMilestoneResult = await supabase.from("milestones").insert(milestonePayload)
 
     if (firstMilestoneResult.error && isMissingColumnError(firstMilestoneResult.error.message)) {
-      firstMilestoneResult = await supabase.from("milestones").insert({
-        project_id: createdProject.id,
-        name: firstMilestoneName,
-      })
+      firstMilestoneResult = await supabase.from("milestones").insert(legacyMilestonePayload)
     }
 
     if (firstMilestoneResult.error) {
       await supabase.from("projects").delete().eq("id", createdProject.id)
       throw new Error(
-        `Failed to create first milestone for project "${createdProject.id}": ${firstMilestoneResult.error.message}`
+        `Failed to create milestones for project "${createdProject.id}": ${firstMilestoneResult.error.message}`
       )
     }
 

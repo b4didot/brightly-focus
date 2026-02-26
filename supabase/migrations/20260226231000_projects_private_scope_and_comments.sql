@@ -17,20 +17,40 @@ ADD COLUMN IF NOT EXISTS created_by_user_id UUID;
 
 UPDATE public.projects
 SET visibility_scope = 'private'
-WHERE visibility_scope = 'personal';
+WHERE visibility_scope::text = 'personal';
 
 ALTER TABLE public.projects
-ALTER COLUMN visibility_scope DROP DEFAULT;
+DROP CONSTRAINT IF EXISTS projects_visibility_scope_check;
 
-ALTER TABLE public.projects
-ALTER COLUMN visibility_scope TYPE public.project_visibility_scope
-USING (
-  CASE
-    WHEN visibility_scope = 'personal' THEN 'private'
-    WHEN visibility_scope IS NULL OR btrim(visibility_scope) = '' THEN 'team'
-    ELSE visibility_scope
-  END
-)::public.project_visibility_scope;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'projects'
+      AND column_name = 'visibility_scope'
+      AND udt_name <> 'project_visibility_scope'
+  ) THEN
+    EXECUTE $sql$
+      ALTER TABLE public.projects
+      ALTER COLUMN visibility_scope DROP DEFAULT
+    $sql$;
+
+    EXECUTE $sql$
+      ALTER TABLE public.projects
+      ALTER COLUMN visibility_scope TYPE public.project_visibility_scope
+      USING (
+        CASE
+          WHEN visibility_scope::text = 'personal' THEN 'private'
+          WHEN visibility_scope IS NULL OR btrim(visibility_scope::text) = '' THEN 'team'
+          ELSE visibility_scope::text
+        END
+      )::public.project_visibility_scope
+    $sql$;
+  END IF;
+END
+$$;
 
 ALTER TABLE public.projects
 ALTER COLUMN visibility_scope SET DEFAULT 'team';
