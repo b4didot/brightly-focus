@@ -173,6 +173,13 @@
   color: var(--text-primary);
 }
 
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .sectionContent {
   display: grid;
   gap: 0.55rem;

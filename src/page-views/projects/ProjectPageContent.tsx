@@ -23,9 +23,10 @@ import type {
   SelectedProjectDetail,
 } from "@/features/projects/queries/projectsWorkspaceQueries"
 import styles from "./projectsWorkspace.module.css"
+import moleculesStyles from "@/components/molecules/molecules.module.css"
 
 type DraftStep = { id: string; name: string; isCompleted: boolean }
-type CreateDraft = { title: string; description: string; dueAt: string; executionOwnerId: string; steps: DraftStep[] }
+type CreateDraft = { title: string; description: string; dueDate: string; dueTime: string; executionOwnerId: string; steps: DraftStep[] }
 type EditDraft = { title: string; description: string; dueAt: string; steps: DraftStep[] }
 type ActiveModal = { type: "none" } | { type: "create"; milestoneId: string } | { type: "detail"; milestoneId: string; itemId: string }
 type ProjectMilestoneDraft = { name: string; description: string }
@@ -76,7 +77,7 @@ function formatDueAt(value: string | null) {
 }
 
 function makeCreateDraft(project: SelectedProjectDetail | null): CreateDraft {
-  return { title: "", description: "", dueAt: "", executionOwnerId: project?.defaultUserId ?? "", steps: [] }
+  return { title: "", description: "", dueDate: "", dueTime: "", executionOwnerId: project?.defaultUserId ?? "", steps: [] }
 }
 
 function makeEditDraft(item: ProjectDetailItem): EditDraft {
@@ -135,6 +136,7 @@ export function ProjectPageContent({ data, showCreateForm }: { data: ProjectsWor
   const [isContextOpen, setIsContextOpen] = useState(true)
   const [activeTab, setActiveTab] = useState<ProjectContextTab>(data.activeTab)
   const [expandedMilestoneIds, setExpandedMilestoneIds] = useState<Set<string>>(new Set())
+  const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set())
   const [modal, setModal] = useState<ActiveModal>({ type: "none" })
   const [createDraft, setCreateDraft] = useState<CreateDraft>(() => makeCreateDraft(data.selectedProject))
   const [detailDraft, setDetailDraft] = useState<EditDraft | null>(null)
@@ -154,6 +156,7 @@ export function ProjectPageContent({ data, showCreateForm }: { data: ProjectsWor
     setDetailDraft(null)
     setModal({ type: "none" })
     setModalError(null)
+    setExpandedItemIds(new Set())
   }, [data.selectedProject])
 
   useEffect(() => {
@@ -209,6 +212,33 @@ export function ProjectPageContent({ data, showCreateForm }: { data: ProjectsWor
       else next.add(milestoneId)
       return next
     })
+  }
+
+  function toggleItem(itemId: string) {
+    setExpandedItemIds((current) => {
+      const next = new Set(current)
+      if (next.has(itemId)) next.delete(itemId)
+      else next.add(itemId)
+      return next
+    })
+  }
+
+  function appendCreateStep() {
+    setCreateDraft((c) => ({ ...c, steps: [...c.steps, createStep(c.steps.length)] }))
+  }
+
+  function moveCreateStep(index: number, dir: "up" | "down") {
+    setCreateDraft((c) => {
+      const target = dir === "up" ? index - 1 : index + 1
+      if (target < 0 || target >= c.steps.length) return c
+      const next = [...c.steps]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return { ...c, steps: next }
+    })
+  }
+
+  function removeCreateStep(index: number) {
+    setCreateDraft((c) => ({ ...c, steps: c.steps.filter((_, i) => i !== index) }))
   }
 
   function closeProjectCreateModal() {
@@ -273,8 +303,10 @@ export function ProjectPageContent({ data, showCreateForm }: { data: ProjectsWor
     fd.set("title", createDraft.title)
     fd.set("executionOwnerId", createDraft.executionOwnerId)
     if (createDraft.description.trim()) fd.set("description", createDraft.description.trim())
-    const dueAt = fromDatetimeLocal(createDraft.dueAt)
-    if (dueAt) fd.set("dueAt", dueAt)
+    if (createDraft.dueDate) {
+      const iso = new Date(`${createDraft.dueDate}T${createDraft.dueTime || "00:00"}`).toISOString()
+      fd.set("dueAt", iso)
+    }
     createDraft.steps.forEach((step) => step.name.trim() && fd.append("stepName", step.name.trim()))
     setModalError(null)
     startTransition(async () => {
@@ -339,13 +371,135 @@ export function ProjectPageContent({ data, showCreateForm }: { data: ProjectsWor
         </div></SectionContainer> : null}
       </div>
 
-      <SectionContainer title="Project Description" tone="workspace">
-        {selectedProject ? <div className={styles.replyList}><form action={updateProjectDescriptionAction} className={styles.commentForm}><input type="hidden" name="actingUserId" value={selectedUserId ?? ""} /><input type="hidden" name="projectId" value={selectedProject.id} /><textarea name="description" className={styles.descriptionArea} defaultValue={selectedProject.description ?? ""} rows={5} maxLength={4000} /><div className={styles.descriptionActions}><Button label="Save Description" type="submit" /></div></form><div className={styles.replyList}>{selectedProject.milestones.map((milestone) => { const expanded = expandedMilestoneIds.has(milestone.id); return <div key={milestone.id} className={styles.contextCard}><button type="button" className={styles.accordionButton} onClick={() => toggleMilestone(milestone.id)}><span>{milestone.name}</span><span>{expanded ? "Hide" : "Show"}</span></button><div className={styles.milestoneHeader}><p className={styles.progressText}>Progress: {formatProgress(milestone.progress)}</p><Button label="Add Item" variant="secondary" onClick={() => openCreate(milestone.id)} /></div>{expanded ? <><p className={styles.itemMeta}>Description: {milestone.description ?? "n/a"}</p><div className={styles.itemList}>{milestone.items.length === 0 ? <p className={styles.emptyText}>No items in this milestone.</p> : milestone.items.map((item) => <button key={item.id} type="button" className={styles.itemRowButton} onClick={() => openDetail(milestone.id, item.id)}><div className={styles.itemRow}><p className={styles.itemTitle}>{item.title}</p><p className={styles.itemMeta}>Owner: {item.ownerName} - <span className={styles.stateBadge}>{item.state}</span> - Progress: {formatProgress(item.stepProgress)} - Due: {formatDueAt(item.dueAt)}</p></div></button>)}</div></> : null}</div> })}</div></div> : <p className={styles.emptyText}>Select a project to view details.</p>}
+      <SectionContainer title="Project Description" tone="workspace" headerAction={selectedProject ? <Button label="Save Description" type="submit" form="project-desc-form" variant="secondary" /> : undefined}>
+        {selectedProject ? <div className={styles.workspaceBody}><form id="project-desc-form" action={updateProjectDescriptionAction} className={styles.commentForm}><input type="hidden" name="actingUserId" value={selectedUserId ?? ""} /><input type="hidden" name="projectId" value={selectedProject.id} /><textarea name="description" className={styles.descriptionArea} defaultValue={selectedProject.description ?? ""} maxLength={4000} /></form>
+          <div className={styles.workspaceMilestoneList}>{selectedProject.milestones.map((milestone) => {
+            const expanded = expandedMilestoneIds.has(milestone.id)
+            const dots = milestone.progress ? Array.from({ length: Math.min(milestone.progress.total, 20) }, (_, i) => i < milestone.progress!.completed) : null
+            return (
+              <div key={milestone.id} className={styles.workspaceMilestone}>
+                <div className={styles.workspaceMilestoneHeader}>
+                  <span className={styles.workspaceMilestoneName}>{milestone.name}</span>
+                  <div className={styles.workspaceMilestoneDots}>
+                    {dots ? dots.map((filled, i) => <span key={i} className={[styles.workspaceDot, filled ? styles.workspaceDotFilled : ""].filter(Boolean).join(" ")} />) : null}
+                  </div>
+                  <button type="button" className={styles.workspaceMilestoneToggle} onClick={() => toggleMilestone(milestone.id)}>{expanded ? "Hide" : "Show"}</button>
+                </div>
+                {expanded ? <>
+                  {milestone.description ? <p className={styles.workspaceMilestoneDesc}>{milestone.description}</p> : null}
+                  <div className={styles.workspaceItemList}>
+                    {milestone.items.length === 0 ? <p className={styles.emptyText}>No items in this milestone.</p> : milestone.items.map((item) => {
+                      const itemExpanded = expandedItemIds.has(item.id)
+                      return (
+                        <div key={item.id} className={styles.workspaceItem}>
+                          <div className={styles.workspaceItemHeader}>
+                            <button type="button" className={styles.workspaceItemToggle} onClick={() => toggleItem(item.id)}>
+                              <span className={styles.workspaceItemChevron}>{itemExpanded ? "▾" : "▸"}</span>
+                              <span>{item.title}</span>
+                            </button>
+                            {itemExpanded ? <Button label="Show item" variant="secondary" onClick={() => openDetail(milestone.id, item.id)} /> : null}
+                          </div>
+                          {itemExpanded && item.description ? <p className={styles.workspaceItemDesc}>{item.description}</p> : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <Button label="Add Item" variant="secondary" onClick={() => openCreate(milestone.id)} />
+                </> : null}
+              </div>
+            )
+          })}</div></div> : <p className={styles.emptyText}>Select a project to view details.</p>}
       </SectionContainer></div>
 
-      {modal.type !== "none" ? <div className={styles.modalLayer} role="dialog" aria-modal="true" aria-label="Project item dialog"><div className={styles.modalBackdrop} onClick={closeModal} /><div className={styles.modalCard}><button type="button" className={styles.closeButton} onClick={closeModal} disabled={isPending}>X</button>
-        {modal.type === "create" && currentMilestone ? <><h4 className={styles.popTitle}>Add Item - {currentMilestone.name}</h4><form onSubmit={handleCreateSubmit} className={styles.popForm}><label className={styles.fieldLabel}>Title<input className={styles.popInput} maxLength={160} required value={createDraft.title} onChange={(e) => setCreateDraft((c) => ({ ...c, title: e.target.value }))} /></label><label className={styles.fieldLabel}>Execution Owner<select className={styles.popInput} value={createDraft.executionOwnerId} onChange={(e) => setCreateDraft((c) => ({ ...c, executionOwnerId: e.target.value }))}>{data.users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label><label className={styles.fieldLabel}>Description<textarea className={styles.popInput} rows={4} maxLength={1000} value={createDraft.description} onChange={(e) => setCreateDraft((c) => ({ ...c, description: e.target.value }))} /></label><label className={styles.fieldLabel}>Due At<input className={styles.popInput} type="datetime-local" value={createDraft.dueAt} onChange={(e) => setCreateDraft((c) => ({ ...c, dueAt: e.target.value }))} /></label><div className={styles.stepEditorHeader}><p className={styles.metaLabel}>Steps</p><Button label="Add Step" variant="secondary" onClick={() => setCreateDraft((c) => updateSteps(c, (s) => [...s, createStep(s.length)]) as CreateDraft)} /></div>{createDraft.steps.map((step, i) => <div key={step.id} className={styles.stepRow}><input className={styles.popInput} value={step.name} onChange={(e) => setCreateDraft((c) => updateSteps(c, (s) => s.map((row, idx) => idx === i ? { ...row, name: e.target.value } : row)) as CreateDraft)} placeholder={`Step ${i + 1}`} maxLength={200} /><div className={styles.stepActions}><Button label="Up" variant="secondary" onClick={() => setCreateDraft((c) => updateSteps(c, (s) => { const n=[...s]; if (i>0) [n[i-1],n[i]]=[n[i],n[i-1]]; return n }) as CreateDraft)} disabled={i===0} /><Button label="Down" variant="secondary" onClick={() => setCreateDraft((c) => updateSteps(c, (s) => { const n=[...s]; if (i<n.length-1) [n[i+1],n[i]]=[n[i],n[i+1]]; return n }) as CreateDraft)} disabled={i===createDraft.steps.length-1} /><Button label="Remove" variant="secondary" onClick={() => setCreateDraft((c) => updateSteps(c, (s) => s.filter((_, idx) => idx !== i)) as CreateDraft)} /></div></div>)}{modalError ? <p className={styles.errorText}>{modalError}</p> : null}<div className={styles.popActions}><Button label="Create Item" type="submit" disabled={isPending || !createDraft.title.trim() || !createDraft.executionOwnerId.trim()} className={styles.modalActionButton} /><Button label="Cancel" variant="secondary" onClick={closeModal} className={styles.modalActionButton} disabled={isPending} /></div></form></> : null}
-        {modal.type === "detail" && currentItem && detailDraft ? <><h4 className={styles.popTitle}>Item Details - {currentItem.title}</h4><form onSubmit={handleDetailSubmit} className={styles.popForm}><label className={styles.fieldLabel}>Title<input className={styles.popInput} maxLength={160} required value={detailDraft.title} disabled={currentItem.state === "completed"} onChange={(e) => setDetailDraft((c) => c ? { ...c, title: e.target.value } : c)} /></label><label className={styles.fieldLabel}>Description<textarea className={styles.popInput} rows={4} maxLength={1000} value={detailDraft.description} disabled={currentItem.state === "completed"} onChange={(e) => setDetailDraft((c) => c ? { ...c, description: e.target.value } : c)} /></label><label className={styles.fieldLabel}>Due At<input className={styles.popInput} type="datetime-local" value={detailDraft.dueAt} disabled={currentItem.state === "completed"} onChange={(e) => setDetailDraft((c) => c ? { ...c, dueAt: e.target.value } : c)} /></label><div className={styles.stepEditorHeader}><p className={styles.metaLabel}>Steps</p><Button label="Add Step" variant="secondary" onClick={() => setDetailDraft((c) => updateSteps(c, (s) => [...s, createStep(s.length)]))} disabled={currentItem.state === "completed"} /></div>{detailDraft.steps.map((step, i) => <div key={step.id} className={styles.stepRow}><input className={styles.popInput} value={step.name} readOnly={currentItem.state === "completed"} onChange={(e) => setDetailDraft((c) => updateSteps(c, (s) => s.map((row, idx) => idx === i ? { ...row, name: e.target.value } : row)))} placeholder={`Step ${i + 1}`} maxLength={200} /><div className={styles.stepActions}><Button label="Up" variant="secondary" onClick={() => setDetailDraft((c) => updateSteps(c, (s) => { const n=[...s]; if (i>0) [n[i-1],n[i]]=[n[i],n[i-1]]; return n }))} disabled={currentItem.state === "completed" || i===0} /><Button label="Down" variant="secondary" onClick={() => setDetailDraft((c) => updateSteps(c, (s) => { const n=[...s]; if (i<n.length-1) [n[i+1],n[i]]=[n[i],n[i+1]]; return n }))} disabled={currentItem.state === "completed" || i===detailDraft.steps.length-1} /><Button label="Remove" variant="secondary" onClick={() => setDetailDraft((c) => updateSteps(c, (s) => s.filter((_, idx) => idx !== i)))} disabled={currentItem.state === "completed"} /></div></div>)}<p className={styles.itemMeta}>State: <span className={styles.stateBadge}>{currentItem.state}</span></p>{modalError ? <p className={styles.errorText}>{modalError}</p> : null}<div className={styles.popActions}><Button label={currentItem.state === "completed" ? "Close" : "Save"} type={currentItem.state === "completed" ? "button" : "submit"} onClick={currentItem.state === "completed" ? closeModal : undefined} disabled={isPending} className={styles.modalActionButton} /><Button label="Cancel" variant="secondary" onClick={closeModal} className={styles.modalActionButton} disabled={isPending} /></div></form></> : null}
+      {modal.type === "create" && currentMilestone && selectedProject ? (
+        <div className={moleculesStyles.modalLayer} role="dialog" aria-modal="true" aria-label="Create Item">
+          <div className={moleculesStyles.modalBackdrop} onClick={closeModal} />
+          <div className={moleculesStyles.modalCard}>
+            <button type="button" className={moleculesStyles.closeButton} onClick={closeModal} disabled={isPending} aria-label="Close">X</button>
+            <h4 className={moleculesStyles.popTitle}>Add Item</h4>
+            <form onSubmit={handleCreateSubmit} className={moleculesStyles.popForm}>
+              <label className={moleculesStyles.fieldLabel}>
+                Name
+                <input className={moleculesStyles.popInput} maxLength={160} required autoFocus value={createDraft.title} onChange={(e) => setCreateDraft((c) => ({ ...c, title: e.target.value }))} />
+              </label>
+              <label className={moleculesStyles.fieldLabel}>
+                Assigned
+                <select className={moleculesStyles.popInput} value={createDraft.executionOwnerId} onChange={(e) => setCreateDraft((c) => ({ ...c, executionOwnerId: e.target.value }))}>
+                  {data.users.length === 0 ? <option value="">No users</option> : data.users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                </select>
+              </label>
+              <div className={moleculesStyles.twoColumn}>
+                <label className={moleculesStyles.fieldLabel}>
+                  Project
+                  <select className={moleculesStyles.popInput} value={selectedProject.id} disabled>
+                    <option value={selectedProject.id}>{selectedProject.name}</option>
+                  </select>
+                </label>
+                <label className={moleculesStyles.fieldLabel}>
+                  Milestone
+                  <select className={moleculesStyles.popInput} value={currentMilestone.id} disabled>
+                    <option value={currentMilestone.id}>{currentMilestone.name}</option>
+                  </select>
+                </label>
+              </div>
+              <div className={moleculesStyles.twoColumn}>
+                <label className={moleculesStyles.fieldLabel}>
+                  Tags
+                  <select className={moleculesStyles.popInput}><option value="">No options yet</option></select>
+                </label>
+                <label className={moleculesStyles.fieldLabel}>
+                  Alarm
+                  <select className={moleculesStyles.popInput}><option value="">No options yet</option></select>
+                </label>
+              </div>
+              <div className={moleculesStyles.twoColumn}>
+                <label className={moleculesStyles.fieldLabel}>
+                  Due Date
+                  <input className={`${moleculesStyles.popInput} ${moleculesStyles.pickerInput}`} type="date" value={createDraft.dueDate} onChange={(e) => setCreateDraft((c) => ({ ...c, dueDate: e.target.value }))} onKeyDown={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} />
+                </label>
+                <label className={moleculesStyles.fieldLabel}>
+                  Due Time
+                  <input className={`${moleculesStyles.popInput} ${moleculesStyles.pickerInput}`} type="time" value={createDraft.dueTime} onChange={(e) => setCreateDraft((c) => ({ ...c, dueTime: e.target.value }))} onKeyDown={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} />
+                </label>
+              </div>
+              <label className={moleculesStyles.fieldLabel}>
+                Description
+                <textarea className={moleculesStyles.popInput} rows={4} maxLength={1000} value={createDraft.description} onChange={(e) => setCreateDraft((c) => ({ ...c, description: e.target.value }))} />
+              </label>
+              {createDraft.steps.map((step, i) => (
+                <div key={step.id} className={moleculesStyles.stepBlock}>
+                  <div className={moleculesStyles.stepDivider} />
+                  <div className={moleculesStyles.stepHeader}>
+                    <h5 className={moleculesStyles.stepTitle}>Step {i + 1}</h5>
+                    <div className={moleculesStyles.stepMoveActions}>
+                      <button type="button" className={moleculesStyles.stepMoveButton} onClick={() => moveCreateStep(i, "up")} disabled={i === 0} aria-label="Move Step Up" title="Move Step Up"><ArrowUpFromDot strokeWidth={2.5} /></button>
+                      <button type="button" className={moleculesStyles.stepMoveButton} onClick={() => moveCreateStep(i, "down")} disabled={i === createDraft.steps.length - 1} aria-label="Move Step Down" title="Move Step Down"><ArrowDownToDot strokeWidth={2.5} /></button>
+                      <button type="button" className={`${moleculesStyles.stepMoveButton} ${moleculesStyles.stepRemoveButton}`} onClick={() => removeCreateStep(i)} aria-label="Remove Step" title="Remove Step"><Trash2 strokeWidth={2.3} /></button>
+                    </div>
+                  </div>
+                  <div className={moleculesStyles.stepFields}>
+                    <label className={moleculesStyles.fieldLabel}>
+                      Step Name
+                      <input className={moleculesStyles.popInput} maxLength={160} value={step.name} onChange={(e) => setCreateDraft((c) => ({ ...c, steps: c.steps.map((row, idx) => idx === i ? { ...row, name: e.target.value } : row) }))} />
+                    </label>
+                  </div>
+                </div>
+              ))}
+              <div className={moleculesStyles.addStepRow}>
+                <Button label="Add Step" variant="secondary" onClick={appendCreateStep} className={moleculesStyles.addStepButton} />
+              </div>
+              {modalError ? <p className={styles.errorText}>{modalError}</p> : null}
+              <div className={moleculesStyles.popActions}>
+                <Button label="Add" type="submit" disabled={isPending || !createDraft.title.trim()} className={moleculesStyles.modalActionButton} />
+                <Button label="Cancel" variant="secondary" onClick={closeModal} className={moleculesStyles.modalActionButton} disabled={isPending} />
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {modal.type === "detail" && currentItem && detailDraft ? <div className={styles.modalLayer} role="dialog" aria-modal="true" aria-label="Project item dialog"><div className={styles.modalBackdrop} onClick={closeModal} /><div className={styles.modalCard}><button type="button" className={styles.closeButton} onClick={closeModal} disabled={isPending}>X</button>
+        <><h4 className={styles.popTitle}>Item Details - {currentItem.title}</h4><form onSubmit={handleDetailSubmit} className={styles.popForm}><label className={styles.fieldLabel}>Title<input className={styles.popInput} maxLength={160} required value={detailDraft.title} disabled={currentItem.state === "completed"} onChange={(e) => setDetailDraft((c) => c ? { ...c, title: e.target.value } : c)} /></label><label className={styles.fieldLabel}>Description<textarea className={styles.popInput} rows={4} maxLength={1000} value={detailDraft.description} disabled={currentItem.state === "completed"} onChange={(e) => setDetailDraft((c) => c ? { ...c, description: e.target.value } : c)} /></label><label className={styles.fieldLabel}>Due At<input className={styles.popInput} type="datetime-local" value={detailDraft.dueAt} disabled={currentItem.state === "completed"} onChange={(e) => setDetailDraft((c) => c ? { ...c, dueAt: e.target.value } : c)} /></label><div className={styles.stepEditorHeader}><p className={styles.metaLabel}>Steps</p><Button label="Add Step" variant="secondary" onClick={() => setDetailDraft((c) => updateSteps(c, (s) => [...s, createStep(s.length)]))} disabled={currentItem.state === "completed"} /></div>{detailDraft.steps.map((step, i) => <div key={step.id} className={styles.stepRow}><input className={styles.popInput} value={step.name} readOnly={currentItem.state === "completed"} onChange={(e) => setDetailDraft((c) => updateSteps(c, (s) => s.map((row, idx) => idx === i ? { ...row, name: e.target.value } : row)))} placeholder={`Step ${i + 1}`} maxLength={200} /><div className={styles.stepActions}><Button label="Up" variant="secondary" onClick={() => setDetailDraft((c) => updateSteps(c, (s) => { const n=[...s]; if (i>0) [n[i-1],n[i]]=[n[i],n[i-1]]; return n }))} disabled={currentItem.state === "completed" || i===0} /><Button label="Down" variant="secondary" onClick={() => setDetailDraft((c) => updateSteps(c, (s) => { const n=[...s]; if (i<n.length-1) [n[i+1],n[i]]=[n[i],n[i+1]]; return n }))} disabled={currentItem.state === "completed" || i===detailDraft.steps.length-1} /><Button label="Remove" variant="secondary" onClick={() => setDetailDraft((c) => updateSteps(c, (s) => s.filter((_, idx) => idx !== i)))} disabled={currentItem.state === "completed"} /></div></div>)}<p className={styles.itemMeta}>State: <span className={styles.stateBadge}>{currentItem.state}</span></p>{modalError ? <p className={styles.errorText}>{modalError}</p> : null}<div className={styles.popActions}><Button label={currentItem.state === "completed" ? "Close" : "Save"} type={currentItem.state === "completed" ? "button" : "submit"} onClick={currentItem.state === "completed" ? closeModal : undefined} disabled={isPending} className={styles.modalActionButton} /><Button label="Cancel" variant="secondary" onClick={closeModal} className={styles.modalActionButton} disabled={isPending} /></div></form></>
       </div></div> : null}
 
       {showCreateForm ? <div className={styles.modalLayer} role="dialog" aria-modal="true" aria-label="Create project dialog"><div className={styles.modalBackdrop} onClick={closeProjectCreateModal} /><div className={styles.modalCard}><button type="button" className={styles.closeButton} onClick={closeProjectCreateModal}>X</button>

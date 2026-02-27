@@ -8,6 +8,7 @@ interface SectionContainerProps {
   tone?: "default" | "secondary" | "context" | "workspace"
   scrollable?: boolean
   hideTitle?: boolean
+  headerAction?: ReactNode
 }
 
 export function SectionContainer({
@@ -17,6 +18,7 @@ export function SectionContainer({
   tone = "default",
   scrollable = true,
   hideTitle = false,
+  headerAction,
 }: SectionContainerProps) {
   const toneClassMap = {
     default: "",
@@ -34,7 +36,16 @@ export function SectionContainer({
 
   return (
     <section className={className}>
-      {!hideTitle ? <h2 className={styles.sectionTitle}>{title}</h2> : null}
+      {!hideTitle ? (
+        headerAction ? (
+          <div className={styles.sectionTitleRow}>
+            <h2 className={styles.sectionTitle}>{title}</h2>
+            {headerAction}
+          </div>
+        ) : (
+          <h2 className={styles.sectionTitle}>{title}</h2>
+        )
+      ) : null}
       <div className={contentClassName}>{children}</div>
     </section>
   )

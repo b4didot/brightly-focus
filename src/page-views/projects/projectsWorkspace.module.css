@@ -315,8 +315,153 @@
   margin-left: 0.9rem;
 }
 
+.workspaceBody {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.workspaceMilestoneList {
+  display: grid;
+  gap: 0;
+}
+
+.workspaceMilestone {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.workspaceAccordion {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: #e2e8f0;
+  padding: 0.15rem 0;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.workspaceAccordion:hover {
+  color: #c7d2fe;
+}
+
+.workspaceMilestoneHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.workspaceMilestoneName {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  white-space: nowrap;
+}
+
+.workspaceMilestoneDots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  flex-wrap: wrap;
+  padding: 0 0.5rem;
+}
+
+.workspaceDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.18);
+  flex-shrink: 0;
+}
+
+.workspaceDotFilled {
+  background: #6366f1;
+}
+
+.workspaceMilestoneToggle {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  background: transparent;
+  padding: 0.18rem 0.45rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.workspaceMilestoneToggle:hover {
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.4);
+}
+
+.workspaceMilestoneDesc {
+  margin: 0;
+  font-size: 0.76rem;
+  color: #94a3b8;
+}
+
+.workspaceItemList {
+  display: grid;
+  gap: 0;
+  border-left: 2px solid rgba(148, 163, 184, 0.1);
+  padding-left: 0.55rem;
+}
+
+.workspaceItem {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.18rem 0;
+}
+
+.workspaceItemHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.workspaceItemToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: left;
+  padding: 0.18rem 0;
+}
+
+.workspaceItemToggle:hover {
+  color: #e2e8f0;
+}
+
+.workspaceItemChevron {
+  color: #64748b;
+  font-size: 0.72rem;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.workspaceItemDesc {
+  margin: 0;
+  font-size: 0.76rem;
+  color: #94a3b8;
+  padding-left: 1.1rem;
+}
+
 .descriptionArea {
-  min-height: 120px;
+  field-sizing: content;
+  min-height: 2.5rem;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 12px;
   background: #0f172a;
@@ -379,6 +524,12 @@
 .popTitle {
   margin: 0;
   font-size: 1rem;
+}
+
+.popBreadcrumb {
+  margin: 0;
+  font-size: 0.76rem;
+  color: #64748b;
 }
 
 .popForm {

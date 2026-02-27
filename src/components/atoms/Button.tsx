@@ -9,6 +9,7 @@ interface ButtonProps {
   variant?: ButtonVariant
   disabled?: boolean
   className?: string
+  form?: string
 }
 
 export function Button({
@@ -18,12 +19,13 @@ export function Button({
   variant = "primary",
   disabled = false,
   className = "",
+  form,
 }: ButtonProps) {
   const buttonClassName =
     variant === "secondary" ? `${styles.button} ${styles.secondary}` : styles.button
 
   return (
-    <button className={`${buttonClassName} ${className}`.trim()} type={type} onClick={onClick} disabled={disabled}>
+    <button className={`${buttonClassName} ${className}`.trim()} type={type} onClick={onClick} disabled={disabled} form={form}>
       {label}
     </button>
   )
