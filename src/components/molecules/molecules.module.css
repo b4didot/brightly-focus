@@ -35,6 +35,10 @@
   inset: 0;
   z-index: 1;
   border-radius: 14px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
 }
 
 .cardTitle {
@@ -50,6 +54,7 @@
   min-width: 0;
   display: grid;
   gap: 0.2rem;
+  pointer-events: none;
 }
 
 .cardTitleRow {
@@ -74,6 +79,7 @@
   font-size: 0.8rem;
   line-height: 1.25;
   color: #94a3b8;
+  pointer-events: none;
 }
 
 .clamp2,
@@ -115,6 +121,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.32rem;
+  pointer-events: none;
 }
 
 .metaItem {
@@ -164,6 +171,42 @@
 .addArea {
   margin-left: auto;
   position: relative;
+}
+
+.offersArea {
+  position: relative;
+}
+
+.offersButton {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+  background: #0f172a;
+  color: #cbd5e1;
+  min-height: 34px;
+  padding: 0.35rem 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.offersButton:hover {
+  border-color: rgba(99, 102, 241, 0.45);
+  background: #1f2937;
+}
+
+.offersBadge {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  background: rgba(99, 102, 241, 0.2);
+  color: #e0e7ff;
 }
 
 .modalLayer {
@@ -415,6 +458,108 @@
 .confirmActions {
   display: flex;
   gap: 0.45rem;
+}
+
+.stateSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  margin-bottom: 0.75rem;
+}
+
+.stateSummary span {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  background: #0f172a;
+}
+
+.offersNotice {
+  margin: 0 0 0.6rem;
+  color: #bbf7d0;
+  font-size: 0.8rem;
+}
+
+.offersError {
+  margin: 0 0 0.6rem;
+  color: #fca5a5;
+  font-size: 0.8rem;
+}
+
+.offersList {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.offerRow {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  background: #0f172a;
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.offerCopy {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.offerTitle {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.offerSummary {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.78rem;
+}
+
+.offerActions {
+  display: inline-flex;
+  gap: 0.45rem;
+}
+
+.offerActionPrimary,
+.offerActionSecondary {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  min-height: 28px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.offerActionPrimary {
+  color: #dcfce7;
+  border-color: rgba(34, 197, 94, 0.6);
+  background: rgba(34, 197, 94, 0.2);
+}
+
+.offerActionPrimary:hover {
+  background: rgba(34, 197, 94, 0.28);
+}
+
+.offerActionSecondary {
+  color: #fde68a;
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.offerActionSecondary:hover {
+  background: rgba(245, 158, 11, 0.24);
+}
+
+.offerActionPrimary:disabled,
+.offerActionSecondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .descriptionContainer {

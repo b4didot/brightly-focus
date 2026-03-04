@@ -10,6 +10,7 @@ interface WaitingQueuePanelProps {
   items: Item[]
   selectedUserId: string | null
   selectedItemId: string | null
+  onSelectItem?: (itemId: string) => void
   onActivate: (itemId: string) => void
   onReorder: (itemId: string, direction: "up" | "down") => void
   error?: string | null
@@ -20,6 +21,7 @@ export function WaitingQueuePanel({
   items,
   selectedUserId,
   selectedItemId,
+  onSelectItem,
   onActivate,
   onReorder,
   error = null,
@@ -55,6 +57,7 @@ export function WaitingQueuePanel({
             key={item.id}
             item={item}
             selectHref={toItemHref(item.id)}
+            onSelect={() => onSelectItem?.(item.id)}
             isSelected={item.id === selectedItemId}
             headerPills={[
               { icon: "project", text: truncate(item.projectName, 18) },

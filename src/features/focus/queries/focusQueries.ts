@@ -1,4 +1,5 @@
 import { getSupabaseServerClient } from "../../../../lib/supabase/server"
+import { withQueryCounter } from "../../../../lib/supabase/queryCounter"
 import { toItemView, type DbItem } from "../../items/adapters/itemAdapter"
 import { toUserView, type DbUser } from "../../users/adapters/userAdapter"
 import type { FocusRouteData } from "../types/viewModels"
@@ -7,8 +8,14 @@ function sortByCompletedAtDesc(items: ReturnType<typeof toItemView>[]) {
   return [...items].sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
 }
 
-async function _getFocusRouteDataImpl(userId?: string): Promise<FocusRouteData> {
-  const supabase = getSupabaseServerClient()
+type QueryCounterOptions = {
+  queryCounter?: {
+    onRequest: (url: string) => void
+  }
+}
+
+async function _getFocusRouteDataImpl(userId?: string, options?: QueryCounterOptions): Promise<FocusRouteData> {
+  const supabase = getSupabaseServerClient({ queryCounter: options?.queryCounter })
 
   const { data: usersData, error: usersError } = await supabase.from("users").select("*")
   if (usersError) {
@@ -33,7 +40,40 @@ async function _getFocusRouteDataImpl(userId?: string): Promise<FocusRouteData> 
   }
 
   const items = ((itemsData ?? []) as DbItem[]).map(toItemView)
-  const selectedItems = items // Already filtered by user at database level
+
+  const milestoneIds = Array.from(
+    new Set(
+      items
+        .map((item) => item.milestoneId)
+        .filter((milestoneId): milestoneId is string => Boolean(milestoneId))
+    )
+  )
+
+  const milestoneProjectById = new Map<string, string>()
+  if (milestoneIds.length > 0) {
+    const { data: milestoneRows, error: milestonesError } = await supabase
+      .from("milestones")
+      .select("id,project_id")
+      .in("id", milestoneIds)
+
+    if (milestonesError) {
+      throw new Error(`Failed to load milestone projects: ${milestonesError.message}`)
+    }
+
+    for (const row of milestoneRows ?? []) {
+      const milestoneId = typeof row.id === "string" ? row.id : null
+      const projectId = typeof row.project_id === "string" ? row.project_id : null
+      if (milestoneId && projectId) {
+        milestoneProjectById.set(milestoneId, projectId)
+      }
+    }
+  }
+
+  const hydratedItems = items.map((item) => ({
+    ...item,
+    projectId: item.projectId ?? (item.milestoneId ? milestoneProjectById.get(item.milestoneId) ?? null : null),
+  }))
+  const selectedItems = hydratedItems // Already filtered by user at database level
 
   const activeItem = selectedItems.find((item) => item.state === "active") ?? null
   const offeredItems = [...selectedItems]
@@ -65,4 +105,12 @@ async function _getFocusRouteDataImpl(userId?: string): Promise<FocusRouteData> 
   }
 }
 
-export const getFocusRouteData = _getFocusRouteDataImpl
+export async function getFocusRouteData(userId?: string, options?: QueryCounterOptions) {
+  if (options?.queryCounter) {
+    return _getFocusRouteDataImpl(userId, options)
+  }
+
+  return withQueryCounter({ label: "focus.getFocusRouteData", threshold: 3 }, async (queryCounter) =>
+    _getFocusRouteDataImpl(userId, { queryCounter })
+  )
+}

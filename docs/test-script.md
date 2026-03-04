@@ -9,7 +9,7 @@
 ## TC-01 Accept Offered Item
 
 1. Go to `/focus?userId=<userA>`.
-2. In `Offered`, click `Accept`.
+2. Open `Offers` in the top bar and click `Accept`.
 3. Verify item appears in waiting queue.
 4. Negative: attempt same action from another user context and confirm failure.
 
@@ -79,3 +79,15 @@ Expected:
 - item positioned at top of waiting
 - active item is not replaced
 - item is standalone (not attached to milestone)
+
+## TC-17 Decline Offered Item
+
+1. Go to `/focus?userId=<userA>`.
+2. Open `Offers` in the top bar and click `Decline` on an offered item.
+3. Verify a visible decline notice appears.
+4. Verify the declined item remains in the offered list.
+
+Expected:
+- Item state remains `offered`.
+- Item is not removed silently.
+- No activation or waiting transition occurs.

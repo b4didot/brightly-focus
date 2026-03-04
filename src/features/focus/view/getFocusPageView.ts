@@ -1,4 +1,5 @@
 import { getSupabaseServerClient } from "../../../../lib/supabase/server"
+import { withQueryCounter } from "../../../../lib/supabase/queryCounter"
 import { getFocusRouteData } from "../queries/focusQueries"
 import { getProjectCatalogRouteData } from "@/features/projects/queries/projectCatalogQueries"
 import type { FocusPageViewData, Item, ItemStatus, Project } from "@/types"
@@ -45,187 +46,120 @@ function toMilestoneStatus(selectedMilestoneId: string | null, milestoneId: stri
   return selectedMilestoneId === milestoneId ? "active" : "planned"
 }
 
+function attachContextNames(items: Item[], projectById: Map<string, Project>) {
+  return items.map((item) => {
+    const project = item.projectId ? projectById.get(item.projectId) : null
+    const milestone =
+      project && item.milestoneId
+        ? project.milestones.find((milestoneRow) => milestoneRow.id === item.milestoneId)
+        : null
+
+    return {
+      ...item,
+      projectName: project?.name,
+      milestoneName: milestone?.title,
+    }
+  })
+}
+
 export async function getFocusPageView(
   userId?: string,
   selectedItemId?: string
 ): Promise<FocusPageViewData> {
-  const routeData = await getFocusRouteData(userId)
-  const supabase = getSupabaseServerClient()
+  return withQueryCounter({ label: "focus.getFocusPageView", threshold: 3 }, async (queryCounter) => {
+    const routeData = await getFocusRouteData(userId, { queryCounter })
+    const supabase = getSupabaseServerClient({ queryCounter })
 
-  const activeItem = routeData.activeItem ? toItemViewModel(routeData.activeItem) : null
-  const waitingItems = routeData.waitingItems.map(toItemViewModel)
-  const offeredItems = routeData.offeredItems.map(toItemViewModel)
-  const selectableItems = [activeItem, ...waitingItems, ...offeredItems].filter(
-    (item): item is Item => Boolean(item)
-  )
-  const selectedItem =
-    (selectedItemId ? selectableItems.find((item) => item.id === selectedItemId) : null) ??
-    activeItem ??
-    waitingItems[0] ??
-    offeredItems[0] ??
-    null
+    const activeItemBase = routeData.activeItem ? toItemViewModel(routeData.activeItem) : null
+    const waitingItemsBase = routeData.waitingItems.map(toItemViewModel)
+    const offeredItemsBase = routeData.offeredItems.map(toItemViewModel)
+    const selectableItems = [activeItemBase, ...waitingItemsBase, ...offeredItemsBase].filter(
+      (item): item is Item => Boolean(item)
+    )
+    const selectedItemBase =
+      (selectedItemId ? selectableItems.find((item) => item.id === selectedItemId) : null) ??
+      activeItemBase ??
+      waitingItemsBase[0] ??
+      offeredItemsBase[0] ??
+      null
 
-  const selectedProjectId = selectedItem?.projectId ?? null
-  const selectedMilestoneId = selectedItem?.milestoneId ?? null
+    const selectedMilestoneId = selectedItemBase?.milestoneId ?? null
 
-  const projectCatalog = routeData.selectedUserId
-    ? await getProjectCatalogRouteData(routeData.selectedUserId)
-    : null
+    const projectCatalog = routeData.selectedUserId
+      ? await getProjectCatalogRouteData(routeData.selectedUserId, { queryCounter })
+      : null
 
-  const projectIds = (projectCatalog?.projects ?? []).map((project) => project.id)
-  const { data: milestoneRows } =
-    projectIds.length > 0
-      ? await supabase
-          .from("milestones")
-          .select("id,project_id,name,description")
-          .in("project_id", projectIds)
-      : { data: [] }
+    const projectIds = (projectCatalog?.projects ?? []).map((project) => project.id)
+    const { data: milestoneRows, error: milestoneError } =
+      projectIds.length > 0
+        ? await supabase
+            .from("milestones")
+            .select("id,project_id,name,description")
+            .in("project_id", projectIds)
+        : { data: [], error: null }
 
-  const milestonesByProject = new Map<string, DbMilestone[]>()
-  for (const milestone of (milestoneRows ?? []) as DbMilestone[]) {
-    const rows = milestonesByProject.get(milestone.project_id) ?? []
-    rows.push(milestone)
-    milestonesByProject.set(milestone.project_id, rows)
-  }
+    if (milestoneError) {
+      throw new Error(`Failed to load project milestones: ${milestoneError.message}`)
+    }
 
-  const availableProjects: Project[] = (projectCatalog?.projects ?? []).map((project) => {
-    const projectMilestones = milestonesByProject.get(project.id) ?? []
+    const milestonesByProject = new Map<string, DbMilestone[]>()
+    for (const milestone of (milestoneRows ?? []) as DbMilestone[]) {
+      const rows = milestonesByProject.get(milestone.project_id) ?? []
+      rows.push(milestone)
+      milestonesByProject.set(milestone.project_id, rows)
+    }
+
+    const availableProjects: Project[] = (projectCatalog?.projects ?? []).map((project) => {
+      const projectMilestones = milestonesByProject.get(project.id) ?? []
+      return {
+        id: project.id,
+        name: project.name,
+        summary: project.description ?? "No project description.",
+        scope: project.visibilityScope === "private" ? "private" : "team",
+        headInfo: `Due: ${project.dueAt ?? "n/a"} | Items: ${project.itemCount}`,
+        milestones: projectMilestones.map((milestone) => ({
+          id: milestone.id,
+          title: milestone.name?.trim() || `Milestone ${milestone.id}`,
+          summary: milestone.description?.trim() || "No milestone description.",
+          status: toMilestoneStatus(selectedMilestoneId, milestone.id),
+        })),
+      }
+    })
+
+    const projectById = new Map(availableProjects.map((project) => [project.id, project]))
+    const activeItem = activeItemBase ? attachContextNames([activeItemBase], projectById)[0] : null
+    const waitingItems = attachContextNames(waitingItemsBase, projectById)
+    const offeredItems = attachContextNames(offeredItemsBase, projectById)
+    const selectableHydrated: Item[] = [...waitingItems, ...offeredItems]
+    if (activeItem) {
+      selectableHydrated.unshift(activeItem)
+    }
+    const selectedItem =
+      (selectedItemBase ? selectableHydrated.find((item) => item.id === selectedItemBase.id) : null) ?? null
+
+    const selectedProject =
+      (selectedItem?.projectId
+        ? availableProjects.find((project) => project.id === selectedItem.projectId)
+        : null) ?? null
+    const selectedMilestone =
+      (selectedItem?.milestoneId
+        ? selectedProject?.milestones.find((milestone) => milestone.id === selectedItem.milestoneId)
+        : null) ?? null
+
     return {
-      id: project.id,
-      name: project.name,
-      summary: project.description ?? "No project description.",
-      scope: project.visibilityScope === "private" ? "private" : "team",
-      headInfo: `Due: ${project.dueAt ?? "n/a"} | Items: ${project.itemCount}`,
-      milestones: projectMilestones.map((milestone) => ({
-        id: milestone.id,
-        title: milestone.name?.trim() || `Milestone ${milestone.id}`,
-        summary: milestone.description?.trim() || "No milestone description.",
-        status: toMilestoneStatus(selectedMilestoneId, milestone.id),
+      filters: routeData.users.map((user) => ({ id: user.id, label: user.name })),
+      selectedUserId: routeData.selectedUserId,
+      availableProjects,
+      availableAssignees: routeData.users.map((user) => ({
+        id: user.id,
+        label: user.id === routeData.selectedUserId ? `Self (${user.name})` : user.name,
       })),
+      activeItem,
+      waitingItems,
+      offeredItems,
+      selectedItem,
+      selectedProject,
+      selectedMilestone,
     }
   })
-
-  const selectedProject =
-    (selectedProjectId
-      ? availableProjects.find((project) => project.id === selectedProjectId)
-      : null) ?? null
-  const selectedMilestone =
-    (selectedMilestoneId
-      ? selectedProject?.milestones.find((milestone) => milestone.id === selectedMilestoneId)
-      : null) ?? null
-
-  const selectableItemIds = selectableItems.map((item) => item.id)
-  const stepsByItemId = new Map<string, number>()
-  const tagsByItemId = new Map<string, string[]>()
-  const alarmByItemId = new Map<string, string>()
-
-  if (selectableItemIds.length > 0) {
-    const { data: stepRows, error: stepError } = await supabase
-      .from("steps")
-      .select("item_id")
-      .in("item_id", selectableItemIds)
-
-    if (!stepError) {
-      for (const row of stepRows ?? []) {
-        const itemId = typeof row.item_id === "string" ? row.item_id : null
-        if (!itemId) {
-          continue
-        }
-        stepsByItemId.set(itemId, (stepsByItemId.get(itemId) ?? 0) + 1)
-      }
-    }
-
-    const { data: itemTagRows, error: itemTagsError } = await supabase
-      .from("item_tags")
-      .select("item_id,tag_id")
-      .in("item_id", selectableItemIds)
-
-    if (!itemTagsError) {
-      const tagIds = Array.from(
-        new Set(
-          (itemTagRows ?? [])
-            .map((row) => (typeof row.tag_id === "string" ? row.tag_id : null))
-            .filter((id): id is string => Boolean(id))
-        )
-      )
-      const { data: tagRows, error: tagsError } =
-        tagIds.length > 0
-          ? await supabase.from("tags").select("id,name").in("id", tagIds)
-          : { data: [], error: null }
-
-      if (!tagsError) {
-        const tagNameById = new Map<string, string>()
-        for (const tagRow of tagRows ?? []) {
-          const tagId = typeof tagRow.id === "string" ? tagRow.id : null
-          const tagName = typeof tagRow.name === "string" ? tagRow.name : null
-          if (tagId && tagName) {
-            tagNameById.set(tagId, tagName)
-          }
-        }
-
-        for (const row of itemTagRows ?? []) {
-          const itemId = typeof row.item_id === "string" ? row.item_id : null
-          const tagId = typeof row.tag_id === "string" ? row.tag_id : null
-          const tagName = tagId ? tagNameById.get(tagId) : null
-          if (!itemId || !tagName) {
-            continue
-          }
-          const existing = tagsByItemId.get(itemId) ?? []
-          tagsByItemId.set(itemId, [...existing, tagName])
-        }
-      }
-    }
-
-    const { data: sessionRows, error: sessionError } = await supabase
-      .from("active_focus_sessions")
-      .select("item_id,interval_minutes,next_trigger_at")
-      .in("item_id", selectableItemIds)
-
-    if (!sessionError) {
-      for (const row of sessionRows ?? []) {
-        const itemId = typeof row.item_id === "string" ? row.item_id : null
-        const intervalMinutes =
-          typeof row.interval_minutes === "number" ? `${row.interval_minutes} min` : "Alarm set"
-        if (!itemId) {
-          continue
-        }
-        alarmByItemId.set(itemId, intervalMinutes)
-      }
-    }
-  }
-
-  const projectById = new Map(availableProjects.map((project) => [project.id, project]))
-  function enrichItem(item: Item): Item {
-    const project = item.projectId ? projectById.get(item.projectId) : null
-    const milestone =
-      project && item.milestoneId
-        ? project.milestones.find((row) => row.id === item.milestoneId)
-        : null
-    const tagList = tagsByItemId.get(item.id) ?? []
-
-    return {
-      ...item,
-      projectName: project?.name ?? undefined,
-      milestoneName: milestone?.title ?? undefined,
-      tags: tagList,
-      alarmLabel: alarmByItemId.get(item.id) ?? undefined,
-      stepsCount: stepsByItemId.get(item.id) ?? 0,
-    }
-  }
-
-  return {
-    filters: routeData.users.map((user) => ({ id: user.id, label: user.name })),
-    selectedUserId: routeData.selectedUserId,
-    availableProjects,
-    availableAssignees: routeData.users.map((user) => ({
-      id: user.id,
-      label: user.id === routeData.selectedUserId ? `Self (${user.name})` : user.name,
-    })),
-    activeItem: activeItem ? enrichItem(activeItem) : null,
-    waitingItems: waitingItems.map(enrichItem),
-    offeredItems: offeredItems.map(enrichItem),
-    selectedItem: selectedItem ? enrichItem(selectedItem) : null,
-    selectedProject,
-    selectedMilestone,
-  }
 }

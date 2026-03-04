@@ -19,6 +19,12 @@ export async function FocusPage({
         <FilterBar
           filters={data.filters}
           selectedFilterId={data.selectedUserId ?? undefined}
+          offeredItems={data.offeredItems}
+          focusStateSummary={{
+            activeCount: data.activeItem ? 1 : 0,
+            waitingCount: data.waitingItems.length,
+            offeredCount: data.offeredItems.length,
+          }}
           addItem={{
             userId: data.selectedUserId,
             action: createUserItemAction,
@@ -31,8 +37,7 @@ export async function FocusPage({
       <FocusPageContent
         activeItem={data.activeItem}
         waitingItems={data.waitingItems}
-        selectedProject={data.selectedProject}
-        selectedMilestone={data.selectedMilestone}
+        availableProjects={data.availableProjects}
         selectedUserId={data.selectedUserId}
         selectedItemId={data.selectedItem?.id ?? null}
       />

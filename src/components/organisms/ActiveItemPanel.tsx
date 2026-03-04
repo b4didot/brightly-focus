@@ -6,9 +6,10 @@ interface ActiveItemPanelProps {
   item: Item | null
   selectedUserId: string | null
   selectedItemId: string | null
+  onSelectItem?: (itemId: string) => void
 }
 
-export function ActiveItemPanel({ item, selectedUserId, selectedItemId }: ActiveItemPanelProps) {
+export function ActiveItemPanel({ item, selectedUserId, selectedItemId, onSelectItem }: ActiveItemPanelProps) {
   function truncate(value: string | undefined, max: number) {
     if (!value || value.trim().length === 0) {
       return "n/a"
@@ -47,7 +48,9 @@ export function ActiveItemPanel({ item, selectedUserId, selectedItemId }: Active
         <ItemCard
           item={item}
           fillHeight
+          descriptionMaxLines={3}
           selectHref={selectHref}
+          onSelect={item ? () => onSelectItem?.(item.id) : undefined}
           isSelected={item.id === selectedItemId}
           headerPills={[
             { icon: "project", text: truncate(item.projectName, 20) },

@@ -22,6 +22,7 @@ interface ItemCardProps {
   action?: ReactNode
   fillHeight?: boolean
   selectHref?: string
+  onSelect?: () => void
   isSelected?: boolean
   bottomMeta?: MetaItem[]
   showDescription?: boolean
@@ -29,11 +30,37 @@ interface ItemCardProps {
   descriptionMaxLines?: 2 | 3
 }
 
+function hasMeaningfulMetaValue(icon: MetaIcon, value: string) {
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) {
+    return false
+  }
+
+  if (icon === "project" || icon === "milestone" || icon === "datetime") {
+    return normalized !== "n/a"
+  }
+
+  if (icon === "tags") {
+    return normalized !== "no tags"
+  }
+
+  if (icon === "alarm") {
+    return normalized !== "no alarm"
+  }
+
+  if (icon === "steps") {
+    return normalized !== "0"
+  }
+
+  return true
+}
+
 export function ItemCard({
   item,
   action,
   fillHeight = false,
   selectHref,
+  onSelect,
   isSelected = false,
   bottomMeta = [],
   showDescription = true,
@@ -43,7 +70,7 @@ export function ItemCard({
   const className = [
     styles.card,
     fillHeight ? styles.cardFill : "",
-    selectHref ? styles.cardSelectable : "",
+    selectHref || onSelect ? styles.cardSelectable : "",
     isSelected ? styles.cardSelected : "",
   ]
     .filter(Boolean)
@@ -51,9 +78,13 @@ export function ItemCard({
   const normalizedHeaderPills = headerPills
     .filter(
       (pill): pill is HeaderPill =>
-        (pill.icon === "project" || pill.icon === "milestone") && Boolean(pill.text)
+        (pill.icon === "project" || pill.icon === "milestone") &&
+        hasMeaningfulMetaValue(pill.icon, pill.text)
     )
     .filter((pill, index, list) => list.findIndex((entry) => entry.icon === pill.icon) === index)
+  const normalizedBottomMeta = bottomMeta.filter((meta) =>
+    hasMeaningfulMetaValue(meta.icon, meta.value)
+  )
 
   function renderMetaIcon(icon: MetaIcon) {
     const commonProps = { size: 14, strokeWidth: 2.2 }
@@ -77,7 +108,16 @@ export function ItemCard({
 
   return (
     <article className={className}>
-      {selectHref ? <Link className={styles.cardHitArea} href={selectHref} aria-label={`Select ${item.title}`} /> : null}
+      {onSelect ? (
+        <button
+          type="button"
+          className={styles.cardHitArea}
+          aria-label={`Select ${item.title}`}
+          onClick={onSelect}
+        />
+      ) : selectHref ? (
+        <Link className={styles.cardHitArea} href={selectHref} aria-label={`Select ${item.title}`} />
+      ) : null}
       <div className={styles.cardRow}>
         <div className={styles.cardMainTop}>
           <div className={styles.cardTitleRow}>
@@ -103,9 +143,9 @@ export function ItemCard({
         </div>
         {action ? <div className={styles.cardAction}>{action}</div> : null}
       </div>
-      {bottomMeta.length > 0 ? (
+      {normalizedBottomMeta.length > 0 ? (
         <div className={styles.metaRow}>
-          {bottomMeta.map((meta) => (
+          {normalizedBottomMeta.map((meta) => (
             <span key={`${meta.icon}-${meta.value}`} className={styles.metaItem}>
               {renderMetaIcon(meta.icon)}
               <span className={styles.metaText}>{meta.value}</span>

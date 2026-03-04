@@ -50,6 +50,13 @@ export async function deleteItem({
       )
     }
 
+    if (row.state !== "offered" && row.state !== "waiting") {
+      throw new FocusEngineError(
+        "DELETE_NOT_ALLOWED_STATE",
+        `Item "${row.id}" cannot be deleted because only offered or waiting items are deletable.`
+      )
+    }
+
     const blockedByOrigin = await hasOriginDependents([row.id])
     if (blockedByOrigin.has(row.id)) {
       throw new FocusEngineError(

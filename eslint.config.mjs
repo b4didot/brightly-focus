@@ -5,6 +5,16 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    files: [
+      "src/features/focus/queries/**/*.ts",
+      "src/features/focus/view/**/*.ts",
+      "src/features/projects/queries/**/*.ts",
+    ],
+    rules: {
+      "no-await-in-loop": "error",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

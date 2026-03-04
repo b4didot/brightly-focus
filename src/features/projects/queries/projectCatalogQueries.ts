@@ -1,4 +1,5 @@
 import { getSupabaseServerClient } from "../../../../lib/supabase/server"
+import { withQueryCounter } from "../../../../lib/supabase/queryCounter"
 import { toUserView, type DbUser, type UserView } from "../../users/adapters/userAdapter"
 
 type DbProject = {
@@ -46,6 +47,12 @@ export type ProjectCatalogRouteData = {
   analyticsProjects: ProjectCatalogItem[]
 }
 
+type QueryCounterOptions = {
+  queryCounter?: {
+    onRequest: (url: string) => void
+  }
+}
+
 function asProjectName(value: string | null | undefined, id: string) {
   const normalized = value?.trim()
   return normalized && normalized.length > 0 ? normalized : `Project ${id}`
@@ -55,8 +62,18 @@ function asScope(value: string | null | undefined): "team" | "private" {
   return value === "private" ? "private" : "team"
 }
 
-export async function getProjectCatalogRouteData(userId?: string): Promise<ProjectCatalogRouteData> {
-  const supabase = getSupabaseServerClient()
+export async function getProjectCatalogRouteData(
+  userId?: string,
+  options?: QueryCounterOptions
+): Promise<ProjectCatalogRouteData> {
+  if (!options?.queryCounter) {
+    return withQueryCounter(
+      { label: "projects.getProjectCatalogRouteData", threshold: 3 },
+      async (queryCounter) => getProjectCatalogRouteData(userId, { queryCounter })
+    )
+  }
+
+  const supabase = getSupabaseServerClient({ queryCounter: options?.queryCounter })
 
   const { data: usersData, error: usersError } = await supabase
     .from("users")
@@ -93,22 +110,34 @@ export async function getProjectCatalogRouteData(userId?: string): Promise<Proje
     throw new Error(`Failed to load projects: ${projectsError.message}`)
   }
 
-  const { data: milestonesData, error: milestonesError } = await supabase
-    .from("milestones")
-    .select("id,project_id")
+  const projectRows = (projectsData ?? []) as DbProject[]
+  const projectIds = projectRows.map((project) => project.id)
+  const { data: milestonesData, error: milestonesError } =
+    projectIds.length > 0
+      ? await supabase
+          .from("milestones")
+          .select("id,project_id")
+          .in("project_id", projectIds)
+      : { data: [], error: null }
 
   if (milestonesError) {
     throw new Error(`Failed to load milestones: ${milestonesError.message}`)
   }
 
-  const { data: itemsData, error: itemsError } = await supabase.from("items").select("id,milestone_id")
+  const milestoneRows = (milestonesData ?? []) as DbMilestone[]
+  const milestoneIds = milestoneRows.map((milestone) => milestone.id)
+  const { data: itemsData, error: itemsError } =
+    milestoneIds.length > 0
+      ? await supabase
+          .from("items")
+          .select("id,milestone_id")
+          .in("milestone_id", milestoneIds)
+      : { data: [], error: null }
 
   if (itemsError) {
     throw new Error(`Failed to load items for project catalog: ${itemsError.message}`)
   }
 
-  const milestoneRows = (milestonesData ?? []) as DbMilestone[]
-  const projectRows = (projectsData ?? []) as DbProject[]
   const milestoneByProject = new Map<string, string[]>()
 
   for (const milestone of milestoneRows) {

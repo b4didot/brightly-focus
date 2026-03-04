@@ -78,30 +78,28 @@ export function ItemWindowPanel({
           />
           <ItemDescription item={item} />
           {isDeleteConfirmOpen ? (
-            <div className={styles.confirmOverlay} role="dialog" aria-modal="true" aria-label="Confirm delete item">
-              <div className={styles.confirmModal}>
-                <p className={styles.confirmText}>Are you sure you want to delete this item?</p>
-                <div className={styles.confirmActions}>
-                  <button
-                    type="button"
-                    className={styles.actionButton}
-                    onClick={() => setIsDeleteConfirmOpen(false)}
-                    disabled={isProcessing}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.actionButton}
-                    onClick={() => {
-                      setIsDeleteConfirmOpen(false)
-                      onDelete?.()
-                    }}
-                    disabled={!canDelete || !onDelete || isProcessing}
-                  >
-                    Confirm Delete
-                  </button>
-                </div>
+            <div className={styles.confirmModal} role="group" aria-label="Confirm delete item">
+              <p className={styles.confirmText}>Are you sure you want to delete this item?</p>
+              <div className={styles.confirmActions}>
+                <button
+                  type="button"
+                  className={styles.actionButton}
+                  onClick={() => setIsDeleteConfirmOpen(false)}
+                  disabled={isProcessing}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={styles.actionButton}
+                  onClick={() => {
+                    setIsDeleteConfirmOpen(false)
+                    onDelete?.()
+                  }}
+                  disabled={!canDelete || !onDelete || isProcessing}
+                >
+                  Confirm Delete
+                </button>
               </div>
             </div>
           ) : null}

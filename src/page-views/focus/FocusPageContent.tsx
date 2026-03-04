@@ -1,49 +1,115 @@
 "use client"
 
-import { useState, useCallback, useTransition, useEffect } from "react"
-import { ActiveItemPanel, ContextTabBar, ContextTabBody, ItemWindowPanel, WaitingQueuePanel, useContextPanelState } from "@/components/organisms"
+import { useState, useCallback, useTransition, useEffect, useMemo } from "react"
+import {
+  ActiveItemPanel,
+  ContextTabBar,
+  ContextTabBody,
+  ItemWindowPanel,
+  WaitingQueuePanel,
+  useContextPanelState,
+} from "@/components/organisms"
 import { SplitLayout } from "@/components/layouts"
-import type { Item, Project, Milestone } from "@/types"
-import { activateItemAction, completeItemAction, reorderWaitingItemAction } from "@/features/focus/actions/focusActions"
+import type { Item, Project } from "@/types"
+import {
+  activateItemAction,
+  completeItemAction,
+  getItemEnrichmentAction,
+  reorderWaitingItemAction,
+  selectItemAction,
+} from "@/features/focus/actions/focusActions"
 import { deleteItemAction } from "@/features/items/actions/itemDeleteActions"
 
 interface FocusPageContentProps {
   activeItem: Item | null
   waitingItems: Item[]
-  selectedProject: Project | null
-  selectedMilestone: Milestone | null
+  availableProjects: Project[]
   selectedUserId: string | null
   selectedItemId: string | null
+}
+
+function mergeEnrichment(baseItem: Item, enrichedItem: Item | null): Item {
+  if (!enrichedItem || enrichedItem.id !== baseItem.id) {
+    return baseItem
+  }
+
+  return {
+    ...baseItem,
+    summary: enrichedItem.summary,
+    projectName: enrichedItem.projectName ?? baseItem.projectName,
+    milestoneName: enrichedItem.milestoneName ?? baseItem.milestoneName,
+    tags: enrichedItem.tags,
+    alarmLabel: enrichedItem.alarmLabel,
+    stepsCount: enrichedItem.stepsCount,
+  }
+}
+
+function replaceSelectedItemInUrl(userId: string | null, itemId: string | null) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  const params = new URLSearchParams(window.location.search)
+  if (userId) {
+    params.set("userId", userId)
+  } else {
+    params.delete("userId")
+  }
+
+  if (itemId) {
+    params.set("selectedItemId", itemId)
+  } else {
+    params.delete("selectedItemId")
+  }
+
+  const query = params.toString()
+  const url = query ? `/focus?${query}` : "/focus"
+  window.history.replaceState(null, "", url)
 }
 
 export function FocusPageContent({
   activeItem: serverActiveItem,
   waitingItems: serverWaitingItems,
-  selectedProject,
-  selectedMilestone,
+  availableProjects,
   selectedUserId,
   selectedItemId,
 }: FocusPageContentProps) {
-  // Optimistic state for active item and waiting queue
   const [optimisticActiveItem, setOptimisticActiveItem] = useState<Item | null>(serverActiveItem)
   const [optimisticWaitingItems, setOptimisticWaitingItems] = useState<Item[]>(serverWaitingItems)
   const [optimisticSelectedItemId, setOptimisticSelectedItemId] = useState<string | null>(selectedItemId)
+  const [enrichedItemsById, setEnrichedItemsById] = useState<Map<string, Item>>(new Map())
+  const [enrichmentLoadingItemId, setEnrichmentLoadingItemId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [processingItemId, setProcessingItemId] = useState<string | null>(null)
-  const [, startTransition] = useTransition()
+  const [isPending, startTransition] = useTransition()
   const { isOpen: isContextOpen, activeTabId, handleTabClick } = useContextPanelState()
 
-  const focusableItems = [optimisticActiveItem, ...optimisticWaitingItems].filter(
-    (item): item is Item => Boolean(item)
+  const focusableItems = useMemo(
+    () => [optimisticActiveItem, ...optimisticWaitingItems].filter((item): item is Item => Boolean(item)),
+    [optimisticActiveItem, optimisticWaitingItems]
   )
   const resolvedSelectedItem =
-    (optimisticSelectedItemId
-      ? focusableItems.find((item) => item.id === optimisticSelectedItemId)
-      : null) ??
+    (optimisticSelectedItemId ? focusableItems.find((item) => item.id === optimisticSelectedItemId) : null) ??
     optimisticActiveItem ??
     focusableItems[0] ??
     null
   const optimisticActiveItemId = optimisticActiveItem?.id ?? null
+  const selectedEnrichedItem = resolvedSelectedItem ? enrichedItemsById.get(resolvedSelectedItem.id) ?? null : null
+  const displayedSelectedItem = resolvedSelectedItem
+    ? mergeEnrichment(resolvedSelectedItem, selectedEnrichedItem)
+    : null
+  const displayedActiveItem =
+    optimisticActiveItem && displayedSelectedItem?.id === optimisticActiveItem.id
+      ? displayedSelectedItem
+      : optimisticActiveItem
+  const selectedProject =
+    (displayedSelectedItem?.projectId
+      ? availableProjects.find((project) => project.id === displayedSelectedItem.projectId)
+      : null) ?? null
+  const selectedMilestone =
+    (displayedSelectedItem?.milestoneId
+      ? selectedProject?.milestones.find((milestone) => milestone.id === displayedSelectedItem.milestoneId)
+      : null) ?? null
 
   useEffect(() => {
     setOptimisticSelectedItemId(selectedItemId)
@@ -55,28 +121,92 @@ export function FocusPageContent({
   }, [serverActiveItem, serverWaitingItems])
 
   useEffect(() => {
+    setEnrichedItemsById(new Map())
+    setEnrichmentLoadingItemId(null)
+  }, [selectedUserId])
+
+  useEffect(() => {
     if (!optimisticSelectedItemId) return
     const stillExists = focusableItems.some((item) => item.id === optimisticSelectedItemId)
     if (!stillExists) {
       setOptimisticSelectedItemId(optimisticActiveItemId)
+      replaceSelectedItemInUrl(selectedUserId, optimisticActiveItemId)
     }
-  }, [optimisticSelectedItemId, focusableItems, optimisticActiveItemId])
+  }, [optimisticSelectedItemId, focusableItems, optimisticActiveItemId, selectedUserId])
 
-  // Sync optimistic state when server data changes (e.g., user switch)
+  const requestEnrichment = useCallback(
+    (itemId: string) => {
+      if (!selectedUserId || enrichedItemsById.has(itemId)) {
+        return
+      }
+
+      setEnrichmentLoadingItemId(itemId)
+      startTransition(async () => {
+        try {
+          const enriched = await getItemEnrichmentAction({ userId: selectedUserId, itemId })
+          setEnrichedItemsById((prev) => {
+            const next = new Map(prev)
+            next.set(itemId, enriched)
+            return next
+          })
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Failed to enrich selected item")
+        } finally {
+          setEnrichmentLoadingItemId((current) => (current === itemId ? null : current))
+        }
+      })
+    },
+    [enrichedItemsById, selectedUserId, startTransition]
+  )
+
+  useEffect(() => {
+    if (!resolvedSelectedItem?.id) {
+      return
+    }
+    requestEnrichment(resolvedSelectedItem.id)
+  }, [resolvedSelectedItem?.id, requestEnrichment])
+
+  const selectItem = useCallback(
+    (itemId: string) => {
+      if (optimisticSelectedItemId === itemId) {
+        return
+      }
+
+      const previousSelectedId = optimisticSelectedItemId
+      setOptimisticSelectedItemId(itemId)
+      replaceSelectedItemInUrl(selectedUserId, itemId)
+      setError(null)
+
+      if (!selectedUserId) {
+        return
+      }
+
+      startTransition(async () => {
+        try {
+          await selectItemAction({ userId: selectedUserId, itemId })
+        } catch (err) {
+          setOptimisticSelectedItemId(previousSelectedId)
+          replaceSelectedItemInUrl(selectedUserId, previousSelectedId)
+          setError(err instanceof Error ? err.message : "Failed to select item")
+        }
+      })
+
+      requestEnrichment(itemId)
+    },
+    [optimisticSelectedItemId, requestEnrichment, selectedUserId, startTransition]
+  )
+
   const handleActivate = useCallback(
     (itemId: string) => {
-      // Find the item being activated from waiting queue
       const selectedWaitingItem = optimisticWaitingItems.find((item) => item.id === itemId)
       if (!selectedWaitingItem) return
 
-      // Compute optimistic state transition
       const newActiveItem = {
         ...selectedWaitingItem,
         status: "active" as const,
       }
       const newWaitingItems = optimisticWaitingItems.filter((item) => item.id !== itemId)
 
-      // If there was a previous active item, move it to front of waiting queue
       if (optimisticActiveItem) {
         newWaitingItems.unshift({
           ...optimisticActiveItem,
@@ -84,47 +214,39 @@ export function FocusPageContent({
         })
       }
 
-      // Apply optimistic updates immediately
       setOptimisticActiveItem(newActiveItem)
       setOptimisticWaitingItems(newWaitingItems)
       setOptimisticSelectedItemId(newActiveItem.id)
+      replaceSelectedItemInUrl(selectedUserId, newActiveItem.id)
       setError(null)
       setProcessingItemId(itemId)
 
-      // Call server action in background
       startTransition(async () => {
         try {
           const formData = new FormData()
           formData.append("userId", selectedUserId ?? "")
           formData.append("itemId", itemId)
           await activateItemAction(formData)
-          // Server action now returns success; optimistic state is already applied
-          // On refetch (via revalidateTag), new data will be fetched
         } catch (err) {
-          // Rollback on error
           setOptimisticActiveItem(serverActiveItem)
           setOptimisticWaitingItems(serverWaitingItems)
           setError(err instanceof Error ? err.message : "Failed to activate item")
-          console.error("Failed to activate item:", err)
         } finally {
           setProcessingItemId(null)
         }
       })
     },
-    [optimisticActiveItem, optimisticWaitingItems, serverActiveItem, serverWaitingItems, selectedUserId]
+    [optimisticActiveItem, optimisticWaitingItems, serverActiveItem, serverWaitingItems, selectedUserId, startTransition]
   )
 
   const handleReorder = useCallback(
     (itemId: string, direction: "up" | "down") => {
-      // Find the item and its current index
       const currentIndex = optimisticWaitingItems.findIndex((item) => item.id === itemId)
       if (currentIndex === -1) return
 
-      // Calculate target index
       const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1
       if (targetIndex < 0 || targetIndex >= optimisticWaitingItems.length) return
 
-      // Optimistically swap items
       const newWaitingItems = [...optimisticWaitingItems]
       ;[newWaitingItems[currentIndex], newWaitingItems[targetIndex]] = [
         newWaitingItems[targetIndex],
@@ -134,7 +256,6 @@ export function FocusPageContent({
       setError(null)
       setProcessingItemId(itemId)
 
-      // Call server action in background
       startTransition(async () => {
         try {
           const formData = new FormData()
@@ -143,16 +264,14 @@ export function FocusPageContent({
           formData.append("direction", direction)
           await reorderWaitingItemAction(formData)
         } catch (err) {
-          // Rollback on error
           setOptimisticWaitingItems(serverWaitingItems)
           setError(err instanceof Error ? err.message : "Failed to reorder item")
-          console.error("Failed to reorder item:", err)
         } finally {
           setProcessingItemId(null)
         }
       })
     },
-    [optimisticWaitingItems, serverWaitingItems, selectedUserId]
+    [optimisticWaitingItems, serverWaitingItems, selectedUserId, startTransition]
   )
 
   const handleComplete = useCallback(
@@ -174,6 +293,7 @@ export function FocusPageContent({
       setOptimisticActiveItem(nextActive)
       setOptimisticWaitingItems(nextWaiting)
       setOptimisticSelectedItemId(nextActive?.id ?? null)
+      replaceSelectedItemInUrl(selectedUserId, nextActive?.id ?? null)
       setError(null)
       setProcessingItemId(itemId)
 
@@ -187,13 +307,12 @@ export function FocusPageContent({
           setOptimisticActiveItem(previousActive)
           setOptimisticWaitingItems(previousWaiting)
           setError(err instanceof Error ? err.message : "Failed to complete item")
-          console.error("Failed to complete item:", err)
         } finally {
           setProcessingItemId(null)
         }
       })
     },
-    [optimisticActiveItem, optimisticWaitingItems, selectedUserId]
+    [optimisticActiveItem, optimisticWaitingItems, selectedUserId, startTransition]
   )
 
   const handleDelete = useCallback(
@@ -201,25 +320,16 @@ export function FocusPageContent({
       const previousActive = optimisticActiveItem
       const previousWaiting = optimisticWaitingItems
 
-      const isActiveItem = optimisticActiveItem?.id === itemId
       const isWaitingItem = optimisticWaitingItems.some((item) => item.id === itemId)
-      if (!isActiveItem && !isWaitingItem) return
+      if (!isWaitingItem) return
 
-      const nextActive = isActiveItem
-        ? (optimisticWaitingItems.length > 0
-            ? {
-                ...optimisticWaitingItems[0],
-                status: "active" as const,
-              }
-            : null)
-        : optimisticActiveItem
-      const nextWaiting = isActiveItem
-        ? (optimisticWaitingItems.length > 0 ? optimisticWaitingItems.slice(1) : [])
-        : optimisticWaitingItems.filter((item) => item.id !== itemId)
+      const nextActive = optimisticActiveItem
+      const nextWaiting = optimisticWaitingItems.filter((item) => item.id !== itemId)
 
       setOptimisticActiveItem(nextActive)
       setOptimisticWaitingItems(nextWaiting)
       setOptimisticSelectedItemId(nextActive?.id ?? null)
+      replaceSelectedItemInUrl(selectedUserId, nextActive?.id ?? null)
       setError(null)
       setProcessingItemId(itemId)
 
@@ -233,13 +343,12 @@ export function FocusPageContent({
           setOptimisticActiveItem(previousActive)
           setOptimisticWaitingItems(previousWaiting)
           setError(err instanceof Error ? err.message : "Failed to delete item")
-          console.error("Failed to delete item:", err)
         } finally {
           setProcessingItemId(null)
         }
       })
     },
-    [optimisticActiveItem, optimisticWaitingItems, selectedUserId]
+    [optimisticActiveItem, optimisticWaitingItems, selectedUserId, startTransition]
   )
 
   return (
@@ -248,9 +357,10 @@ export function FocusPageContent({
       leftSections={[
         <ActiveItemPanel
           key="active"
-          item={optimisticActiveItem}
+          item={displayedActiveItem}
           selectedUserId={selectedUserId}
           selectedItemId={optimisticSelectedItemId}
+          onSelectItem={selectItem}
         />,
         <WaitingQueuePanel
           key="waiting"
@@ -259,6 +369,7 @@ export function FocusPageContent({
           selectedItemId={optimisticSelectedItemId}
           onActivate={handleActivate}
           onReorder={handleReorder}
+          onSelectItem={selectItem}
           error={error}
           processingItemId={processingItemId}
         />,
@@ -271,12 +382,20 @@ export function FocusPageContent({
       }
       rightBottom={
         <ItemWindowPanel
-          item={resolvedSelectedItem}
-          canComplete={Boolean(selectedUserId && resolvedSelectedItem?.id === optimisticActiveItem?.id)}
-          canDelete={Boolean(selectedUserId && resolvedSelectedItem)}
-          isProcessing={processingItemId === resolvedSelectedItem?.id}
+          item={displayedSelectedItem}
+          canComplete={Boolean(selectedUserId && displayedSelectedItem?.id === optimisticActiveItem?.id)}
+          canDelete={Boolean(selectedUserId && displayedSelectedItem?.status === "waiting")}
+          isProcessing={
+            processingItemId === displayedSelectedItem?.id ||
+            enrichmentLoadingItemId === displayedSelectedItem?.id ||
+            isPending
+          }
           onComplete={optimisticActiveItem ? () => handleComplete(optimisticActiveItem.id) : undefined}
-          onDelete={resolvedSelectedItem ? () => handleDelete(resolvedSelectedItem.id) : undefined}
+          onDelete={
+            displayedSelectedItem && displayedSelectedItem.status === "waiting"
+              ? () => handleDelete(displayedSelectedItem.id)
+              : undefined
+          }
         />
       }
       isContextOpen={isContextOpen}

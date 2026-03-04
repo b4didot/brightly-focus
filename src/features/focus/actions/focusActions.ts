@@ -6,10 +6,13 @@ import { acceptItem } from "../../../../lib/focus-engine/acceptItem"
 import { activateItem } from "../../../../lib/focus-engine/activateItem"
 import { completeItem } from "../../../../lib/focus-engine/completeItem"
 import { createUserItem } from "../../../../lib/focus-engine/createUserItem"
+import { declineItem } from "../../../../lib/focus-engine/declineItem"
 import { toFocusEngineError } from "../../../../lib/focus-engine/errors"
 import { reorderWaitingItem } from "../../../../lib/focus-engine/reorderWaitingItem"
+import { withQueryCounter } from "../../../../lib/supabase/queryCounter"
 import { mapFocusEngineErrorToUserMessage } from "./errorMapping"
 import type { EnrichedItemData } from "../types/viewModels"
+import { getItemEnrichmentQuery } from "../queries/itemEnrichmentQuery"
 
 function assertField(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? "").trim()
@@ -48,6 +51,21 @@ export async function acceptItemAction(formData: FormData) {
     const itemId = assertField(formData, "itemId")
     await acceptItem({ itemId, userId })
     // Cache invalidation happens in background - optimistic update already on client
+    revalidateInBackground(["/focus"])
+    return { success: true, userId, itemId }
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error
+    }
+    throw new Error(mapFocusEngineErrorToUserMessage(toFocusEngineError(error)))
+  }
+}
+
+export async function declineItemAction(formData: FormData) {
+  try {
+    const userId = assertField(formData, "userId")
+    const itemId = assertField(formData, "itemId")
+    await declineItem({ itemId, userId })
     revalidateInBackground(["/focus"])
     return { success: true, userId, itemId }
   } catch (error) {
@@ -126,92 +144,130 @@ export async function createUserItemAction(formData: FormData) {
 
 export async function enrichItemAction(
   itemId: string,
-  projectId: string | null,
-  milestoneId: string | null
+  _projectId: string | null,
+  _milestoneId: string | null
 ): Promise<EnrichedItemData> {
   try {
+    void _projectId
+    void _milestoneId
     const supabase = getSupabaseServerClient()
-
-    // Fetch project info if item has a project
-    let projectName: string | undefined
-    if (projectId) {
-      const { data: projectData } = await supabase
-        .from("projects")
-        .select("name")
-        .eq("id", projectId)
-        .single()
-
-      projectName = projectData?.name
-    }
-
-    // Fetch milestone info if item has a milestone
-    let milestoneName: string | undefined
-    if (milestoneId && projectId) {
-      const { data: milestoneData } = await supabase
-        .from("milestones")
-        .select("name")
-        .eq("id", milestoneId)
-        .eq("project_id", projectId)
-        .single()
-
-      milestoneName = milestoneData?.name
-    }
-
-    // Fetch steps count
-    const { data: stepData, error: stepError } = await supabase
-      .from("steps")
-      .select("id", { count: "exact", head: true })
-      .eq("item_id", itemId)
-
-    const stepsCount = stepError ? 0 : stepData?.length ?? 0
-
-    // Fetch tags
-    let tags: string[] = []
-    const { data: itemTagData } = await supabase
-      .from("item_tags")
-      .select("tag_id")
-      .eq("item_id", itemId)
-
-    if (itemTagData && itemTagData.length > 0) {
-      const tagIds = itemTagData
-        .map((row) => (typeof row.tag_id === "string" ? row.tag_id : null))
-        .filter((id): id is string => Boolean(id))
-
-      if (tagIds.length > 0) {
-        const { data: tagNames } = await supabase.from("tags").select("name").in("id", tagIds)
-
-        tags = (tagNames ?? [])
-          .map((row) => (typeof row.name === "string" ? row.name : null))
-          .filter((name): name is string => Boolean(name))
-      }
-    }
-
-    // Fetch alarm info
-    let alarmLabel: string | undefined
-    const { data: sessionData } = await supabase
-      .from("active_focus_sessions")
-      .select("interval_minutes")
-      .eq("item_id", itemId)
+    const { data: itemData, error: itemError } = await supabase
+      .from("items")
+      .select("id,execution_owner_id")
+      .eq("id", itemId)
       .single()
 
-    if (sessionData?.interval_minutes) {
-      alarmLabel = `${sessionData.interval_minutes} min`
-    } else if (sessionData) {
-      alarmLabel = "Alarm set"
+    if (itemError || !itemData?.execution_owner_id) {
+      throw new Error(`Failed to enrich item: ${itemError?.message ?? "Item not found"}`)
     }
+
+    const enriched = await withQueryCounter(
+      { label: "focus.enrichItemAction", threshold: 3 },
+      async (queryCounter) => {
+        const countedSupabase = getSupabaseServerClient({ queryCounter })
+        return getItemEnrichmentQuery({
+          supabase: countedSupabase,
+          userId: itemData.execution_owner_id,
+          itemId,
+        })
+      }
+    )
 
     return {
       itemId,
-      projectName,
-      milestoneName,
-      tags,
-      stepsCount,
-      alarmLabel,
+      projectName: enriched.projectName,
+      milestoneName: enriched.milestoneName,
+      tags: enriched.tags ?? [],
+      stepsCount: enriched.stepsCount ?? 0,
+      alarmLabel: enriched.alarmLabel,
     }
   } catch (error) {
     if (isNextRedirectError(error)) {
       throw error
     }
     throw new Error(`Failed to enrich item: ${error instanceof Error ? error.message : "Unknown error"}`)
+  }
+}
+
+export async function selectItemAction({ userId, itemId }: { userId: string; itemId: string }) {
+  try {
+    const normalizedUserId = userId.trim()
+    const normalizedItemId = itemId.trim()
+
+    if (!normalizedUserId) {
+      throw new Error("Missing required field \"userId\".")
+    }
+    if (!normalizedItemId) {
+      throw new Error("Missing required field \"itemId\".")
+    }
+
+    const result = await withQueryCounter(
+      { label: "focus.selectItemAction", threshold: 3 },
+      async (queryCounter) => {
+        const supabase = getSupabaseServerClient({ queryCounter })
+        const { data, error } = await supabase
+          .from("items")
+          .select("id,state")
+          .eq("id", normalizedItemId)
+          .eq("execution_owner_id", normalizedUserId)
+          .single()
+
+        if (error || !data) {
+          throw new Error(
+            `Failed to select item "${normalizedItemId}" for user "${normalizedUserId}": ${error?.message ?? "Item not found"}`
+          )
+        }
+
+        return { itemId: data.id as string, state: data.state as string }
+      }
+    )
+
+    console.info(
+      JSON.stringify({
+        event: "focus.item_selected",
+        userId: normalizedUserId,
+        itemId: result.itemId,
+        state: result.state,
+        at: new Date().toISOString(),
+      })
+    )
+
+    return result
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error
+    }
+    throw new Error(error instanceof Error ? error.message : "Failed to select item")
+  }
+}
+
+export async function getItemEnrichmentAction({ userId, itemId }: { userId: string; itemId: string }) {
+  try {
+    const normalizedUserId = userId.trim()
+    const normalizedItemId = itemId.trim()
+
+    if (!normalizedUserId) {
+      throw new Error("Missing required field \"userId\".")
+    }
+    if (!normalizedItemId) {
+      throw new Error("Missing required field \"itemId\".")
+    }
+
+    return withQueryCounter(
+      { label: "focus.getItemEnrichmentAction", threshold: 3 },
+      async (queryCounter) => {
+        const supabase = getSupabaseServerClient({ queryCounter })
+        return getItemEnrichmentQuery({
+          supabase,
+          userId: normalizedUserId,
+          itemId: normalizedItemId,
+        })
+      }
+    )
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error
+    }
+    throw new Error(error instanceof Error ? error.message : "Failed to enrich selected item")
   }
 }

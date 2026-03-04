@@ -4,8 +4,7 @@ import { useTransition, useState, useEffect } from "react"
 import { ItemCard } from "@/components/molecules"
 import { SectionContainer } from "@/components/layouts"
 import type { Item } from "@/types"
-import { acceptItemAction } from "@/features/focus/actions/focusActions"
-import { deleteItemAction } from "@/features/items/actions/itemDeleteActions"
+import { acceptItemAction, declineItemAction } from "@/features/focus/actions/focusActions"
 import styles from "./organisms.module.css"
 
 interface OfferedQueuePanelProps {
@@ -14,7 +13,7 @@ interface OfferedQueuePanelProps {
 }
 
 export function OfferedQueuePanel({ items, selectedUserId }: OfferedQueuePanelProps) {
-  const [isPending, startTransition] = useTransition()
+  const [, startTransition] = useTransition()
   const [offeredItems, setOfferedItems] = useState(items)
   const [error, setError] = useState<string | null>(null)
   const [processingItemId, setProcessingItemId] = useState<string | null>(null)
@@ -61,31 +60,20 @@ export function OfferedQueuePanel({ items, selectedUserId }: OfferedQueuePanelPr
     })
   }
 
-  function handleDelete(itemId: string) {
-    // Save previous state for rollback
-    const previousOffered = offeredItems
-
-    // 1. IMMEDIATE optimistic delete
-    const newOffered = offeredItems.filter((item) => item.id !== itemId)
-
-    // Update state optimistically
-    setOfferedItems(newOffered)
+  function handleDecline(itemId: string) {
     setError(null)
     setProcessingItemId(itemId)
 
-    // 2. Run server action in parallel
     startTransition(async () => {
       try {
         const formData = new FormData()
-        formData.append("actingUserId", selectedUserId ?? "")
+        formData.append("userId", selectedUserId ?? "")
         formData.append("itemId", itemId)
-        await deleteItemAction(formData)
-        // 3. SUCCESS: Keep optimistic state, server confirmed it
+        await declineItemAction(formData)
+        setError("Declined. This offer remains visible until clarified.")
       } catch (err) {
-        // 4. FAILURE: Rollback on error
-        setOfferedItems(previousOffered)
-        setError(err instanceof Error ? err.message : "Failed to delete item")
-        console.error("Failed to delete item:", err)
+        setError(err instanceof Error ? err.message : "Failed to decline item")
+        console.error("Failed to decline item:", err)
       } finally {
         setProcessingItemId(null)
       }
@@ -120,11 +108,11 @@ export function OfferedQueuePanel({ items, selectedUserId }: OfferedQueuePanelPr
                   className={styles.actionButton}
                   type="button"
                   disabled={!selectedUserId || processingItemId === item.id}
-                  aria-label="Delete"
-                  title="Delete"
-                  onClick={() => handleDelete(item.id)}
+                  aria-label="Decline"
+                  title="Decline"
+                  onClick={() => handleDecline(item.id)}
                 >
-                  Delete
+                  Decline
                 </button>
               </div>
             }

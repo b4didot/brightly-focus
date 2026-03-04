@@ -7,7 +7,7 @@ import {
   requireOwnership,
   requireState,
 } from "./guards"
-import { getNextWaitingPosition } from "./queue"
+import { getNextWaitingPosition, normalizeWaitingQueue } from "./queue"
 
 type FocusItem = {
   id: string
@@ -33,6 +33,20 @@ export async function acceptItem({
     requireState(item, "offered")
     requireAllowedTransition(item.state, "waiting")
     requireOwnership(item, normalizedUserId)
+
+    const { data: waitingRows, error: waitingRowsError } = await supabase
+      .from("items")
+      .select("id,waiting_position")
+      .eq("execution_owner_id", normalizedUserId)
+      .eq("state", "waiting")
+      .order("waiting_position", { ascending: true })
+
+    if (waitingRowsError) {
+      throw new FocusEngineError(
+        "DB_ERROR",
+        `Failed to load waiting queue for user "${normalizedUserId}" before accept: ${waitingRowsError.message}`
+      )
+    }
 
     const nextWaitingPosition = await getNextWaitingPosition(supabase, normalizedUserId)
 
@@ -65,7 +79,55 @@ export async function acceptItem({
       )
     }
 
-    return updatedItem as FocusItem
+    const positions = (waitingRows ?? [])
+      .map((row) => row.waiting_position)
+      .filter((value): value is number => typeof value === "number")
+    positions.push(nextWaitingPosition)
+    const currentMin = positions.length > 0 ? Math.min(...positions) : 0
+    const topTempPosition = currentMin - positions.length - 100
+
+    const { data: movedToTopTemp, error: topTempError } = await supabase
+      .from("items")
+      .update({ waiting_position: topTempPosition })
+      .eq("id", normalizedItemId)
+      .eq("execution_owner_id", normalizedUserId)
+      .eq("state", "waiting")
+      .eq("waiting_position", nextWaitingPosition)
+      .select("id")
+      .maybeSingle()
+
+    if (topTempError) {
+      throw new FocusEngineError(
+        "QUEUE_CONFLICT",
+        `Failed to move accepted item "${normalizedItemId}" to queue top for user "${normalizedUserId}": ${topTempError.message}`,
+        true
+      )
+    }
+
+    if (!movedToTopTemp) {
+      throw new FocusEngineError(
+        "QUEUE_CONFLICT",
+        `Accepted item "${normalizedItemId}" changed during top placement.`,
+        true
+      )
+    }
+
+    await normalizeWaitingQueue(supabase, normalizedUserId)
+
+    const { data: refreshed, error: refreshedError } = await supabase
+      .from("items")
+      .select("*")
+      .eq("id", normalizedItemId)
+      .maybeSingle()
+
+    if (refreshedError || !refreshed) {
+      throw new FocusEngineError(
+        "DB_ERROR",
+        `Accepted item "${normalizedItemId}" could not be reloaded after queue normalization.`
+      )
+    }
+
+    return refreshed as FocusItem
   } catch (error) {
     throw toFocusEngineError(error)
   }
